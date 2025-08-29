@@ -130,6 +130,12 @@ Phase 0 — Project Bootstrap (E2E)
 - Add basic logging scaffolding using `os.log` with subsystem `com.oneoffrepo.lfm2onios` and categories: `app`, `download`, `runtime`, `ui`.
 - Simulator automation: list schemes, build for a simulator, run the app, verify launch and log output.
 
+- Status: Done (2025-08-29)
+- Run log snippet (launch):
+```
+app: { event: "launch", build: "1.0 (1)" }
+```
+
 Phase 1 — Integrate Leap SDK (Compile E2E)
 - Add SPM dependency `https://github.com/Liquid4All/leap-ios.git` (v0.5.0+), include products `LeapSDK` and `LeapSDKTypes`.
 - Verify the app still builds and runs (even if not yet using the SDK at runtime).
