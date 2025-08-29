@@ -154,6 +154,15 @@ Phase 2 — Model Catalog UI (E2E)
 - Persist selection intent to `UserDefaults`.
 - Run end-to-end; log selection events and navigation flows.
 
+ - Status: Done (2025-08-29)
+ - Run log snippet (selection flow):
+ ```
+ app: { event: "launch", build: "1.0 (1)" }
+ app: { event: "leap:sdkLinked", sdkVersion: "unknown" }
+ ui: { event: "rootAppear" }
+ ui: { event: "select", modelSlug: "qwen-0.6b" }
+ ```
+
 Phase 3 — Download Flow (Mock, E2E)
 - Implement `ModelDownloadService` with a mock downloader to simulate progress and completion; wire to the UI progress.
 - Exercise cancel, retry, and error states with mock injections; log all state transitions.
