@@ -82,11 +82,17 @@ Build a SwiftUI iOS application (iOS 17.2+) that runs local inference using the 
   - Prefer dynamic, on-demand download over bundling, using Leap Model Downloader APIs (e.g., `LeapDownloadableModel.resolve` or `HuggingFaceDownloadableModel`).
   - Ref: Download On-Demand — [link](https://leap.liquid.ai/docs/edge-sdk/ios/ios-quick-start-guide)
 
+### Downloader Packaging and ATS/Networking
+- Downloader module import is `import LeapModelDownloader`. If this is not included with the core SPM, add the companion SPM package provided by Leap and pin to a compatible `~> 0.5.0` version.
+- All downloads occur over HTTPS; no ATS exceptions expected. If any model source requires non-HTTPS (not recommended), we will add targeted ATS exceptions with justification.
+- MVP uses foreground downloads with resume/retry; background transfer is out-of-scope.
+
 - Model Catalog (initial curated set)
   - Example entries (subject to availability in the Leap Model Library):
-    - Qwen 0.6B (8DA4W, 4K context) — slug: `qwen-0.6b`, quantization example: `qwen-0.6b-20250610-8da4w`, filename example: `qwen3-0_6b_8da4w_4096.bundle`.
-    - Additional small/medium models from `https://leap.liquid.ai/models` with differing sizes/speeds.
-  - We’ll hardcode 3–5 options with metadata; future work can fetch catalog dynamically.
+    - Qwen 0.6B (8DA4W, 4K context) — slug: `qwen-0.6b`, quantization: `qwen-0.6b-20250610-8da4w`, filename: `qwen3-0_6b_8da4w_4096.bundle`.
+    - TinyLM 0.5–1B class model (fast on mobile) — choose a small-capacity option from the model library.
+    - Mid-size 1.5–3B class model — slower but better quality for testing trade-offs.
+  - We’ll hardcode 3–5 options with metadata; future work can fetch catalog dynamically from the Leap Model Library — [link](https://leap.liquid.ai/models).
 
 - Persistence
   - Store selected model slug and local URL in `UserDefaults` (or compute URL from downloader on launch).
@@ -194,6 +200,19 @@ Owner’s Notes
 - Add a developer “Debug Info” sheet (hidden behind a long-press or gesture) that shows last errors and current states.
 - Never log sensitive user content beyond what appears in UI; prefer redaction for prompts if needed.
 
+Example log lines (format guidelines)
+```
+app: { event: "launch", sdkVersion: "0.5.0", build: "###" }
+download: { event: "resolve", modelSlug: "qwen-0.6b", quant: "qwen-0.6b-20250610-8da4w" }
+download: { event: "progress", modelSlug: "qwen-0.6b", pct: 35 }
+download: { event: "complete", modelSlug: "qwen-0.6b", localPath: ".../qwen3-0_6b_8da4w_4096.bundle" }
+runtime: { event: "load:start", url: "bundle://..." }
+runtime: { event: "load:success", tokenPerSecond: 24.3 }
+runtime: { event: "stream:start" }
+runtime: { event: "stream:complete", tokens: 124, finishReason: "stop" }
+ui: { event: "send", chars: 42 }
+```
+
 ## Testing & Validation
 - After each phase, execute simulator automation to detect compile/runtime issues:
   - List available simulators and choose a recent iPhone runtime.
@@ -201,6 +220,21 @@ Owner’s Notes
   - Capture console output and validate presence of expected log markers (`app`, `download`, `runtime`, `ui`).
 - Validate first-run flow, download progress, successful `Leap.load`, and streaming responses using small prompts.
 - Periodically build to device for performance checks once download/runtime phases are complete.
+
+### Simulator Automation (xcodebuildmcp)
+We will use our simulator automation helper to run and validate after each phase:
+- List simulators: `list_sims`
+- Build & run on simulator: `build_run_sim` (workspace/project path, scheme, simulatorName or simulatorId)
+- Open Simulator app when needed: `open_sim`
+- Launch installed app explicitly: `launch_app_sim` (bundleId)
+- Capture logs during runs: `start_sim_log_cap` / `stop_sim_log_cap`
+- Obtain simulator app path if needed: `get_sim_app_path`
+
+We will assert that log output contains the expected structured markers defined above for the current phase.
+
+### Device Performance Validation
+- After Phase 5 (Runtime & Chat), perform a device build and test run to measure token speed and memory behavior.
+- If available, capture `runtime` logs with token/sec statistics and any memory warnings. Address regressions before continuing.
 
 ## Open Questions / Assumptions
 - Leap Model Downloader module import path: docs show `import LeapModelDownloader`. We assume it’s available via the Leap SPM or a companion package; if separate, we’ll add its SPM as well.
