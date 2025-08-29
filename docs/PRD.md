@@ -168,6 +168,23 @@ Phase 3 — Download Flow (Mock, E2E)
 - Exercise cancel, retry, and error states with mock injections; log all state transitions.
 - Run end-to-end in simulator to validate UX and state handling.
 
+- Status: Done (2025-08-29) — validated on iPhone 16 Pro simulator
+- Run log snippet (mock download + retry):
+```
+app: { event: "launch", build: "1.0 (1)" }
+app: { event: "leap:sdkLinked", sdkVersion: "unknown" }
+ui: { event: "rootAppear" }
+download: { event: "resolve", modelSlug: "qwen-0.6b", quant: "qwen-0.6b-20250610-8da4w" }
+download: { event: "progress", pct: 20 }
+download: { event: "progress", pct: 50 }
+download: { event: "failed", error: "network.transient" }
+download: { event: "retry" }
+download: { event: "progress", pct: 20 }
+download: { event: "progress", pct: 50 }
+download: { event: "progress", pct: 80 }
+download: { event: "complete" }
+```
+
 Phase 4 — Real Download Integration (E2E)
 - Replace mock with Leap downloader APIs (`import LeapModelDownloader`), using either `LeapDownloadableModel.resolve` or `HuggingFaceDownloadableModel` based on catalog entry.
 - Persist downloaded model local URL or re-resolvable descriptor.
