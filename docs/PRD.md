@@ -116,41 +116,91 @@ Build a SwiftUI iOS application (iOS 17.2+) that runs local inference using the 
 - Simulator performance is slow → document recommendation to test on device.
 - API surface changes across SDK versions → pin to `~> 0.5.0`.
 
-## Implementation Plan
-1. Project Scaffolding
-   - Create SwiftUI iOS app (iOS 17.2 minimum).
-   - Add SPM dependency for Leap iOS SDK (`LeapSDK` and `LeapSDKTypes`).
-   - Prepare app targets and build settings.
+## Implementation Plan (Phased E2E Slices)
+Each phase is independently buildable and runnable end-to-end in the iOS Simulator. After every phase, run the simulator automation to catch compile/runtime issues and review logs.
 
-2. Model Services
-   - Implement `ModelCatalog` with curated options referencing slugs and quantizations from the model library.
-   - Implement `ModelDownloadService` using Leap downloader (`LeapDownloadableModel` / `HuggingFaceDownloadableModel`).
-   - Implement persistence for chosen model and local path.
+Phase 0 — Project Bootstrap (E2E)
+- Create SwiftUI iOS app (iOS 17.2 minimum) with a single screen (“Hello lfm2”).
+- Add basic logging scaffolding using `os.log` with subsystem `com.oneoffrepo.lfm2onios` and categories: `app`, `download`, `runtime`, `ui`.
+- Simulator automation: list schemes, build for a simulator, run the app, verify launch and log output.
 
-3. Runtime & Chat
-   - Implement `ModelRuntimeService` to `Leap.load(url:)` and create `Conversation`.
-   - Implement `ChatStore` with streaming `generateResponse` integration.
+Phase 1 — Integrate Leap SDK (Compile E2E)
+- Add SPM dependency `https://github.com/Liquid4All/leap-ios.git` (v0.5.0+), include products `LeapSDK` and `LeapSDKTypes`.
+- Verify the app still builds and runs (even if not yet using the SDK at runtime).
+- Log successful SDK link at startup.
 
-4. UI
-   - `ModelSelectionView` with list, details, and download progress UI.
-   - `ChatView` with message list, input, send button, streaming updates.
-   - `SettingsView` to switch or remove models.
+Phase 2 — Model Catalog UI (E2E)
+- Implement `ModelCatalog` (static list of 3–5 curated models with metadata from the model library).
+- Implement `ModelSelectionView` showing the models and a “Download” action (no real download yet).
+- Persist selection intent to `UserDefaults`.
+- Run end-to-end; log selection events and navigation flows.
 
-5. Build, Run, and Iterate
-   - Build for Simulator (for correctness) and device (for performance).
-   - Handle errors surfaced in logs; refine UX.
+Phase 3 — Download Flow (Mock, E2E)
+- Implement `ModelDownloadService` with a mock downloader to simulate progress and completion; wire to the UI progress.
+- Exercise cancel, retry, and error states with mock injections; log all state transitions.
+- Run end-to-end in simulator to validate UX and state handling.
 
-6. Polishing
-   - Basic empty/error states, accessibility labels, loading indicators.
-   - Basic unit tests for persistence and catalog selection logic (time-permitting).
+Phase 4 — Real Download Integration (E2E)
+- Replace mock with Leap downloader APIs (`import LeapModelDownloader`), using either `LeapDownloadableModel.resolve` or `HuggingFaceDownloadableModel` based on catalog entry.
+- Persist downloaded model local URL or re-resolvable descriptor.
+- Add storage checks and user-friendly errors; log progress ticks at ~10% intervals and errors verbosely.
+- Run end-to-end; confirm file presence post-download.
+
+Phase 5 — Runtime Load & Chat (E2E)
+- Implement `ModelRuntimeService` using `Leap.load(url:)` to create a reusable `ModelRunner`.
+- Create a `Conversation` on demand and integrate with `ChatStore`.
+- Implement `ChatView` input and message list; stream tokens using `generateResponse` and update UI incrementally.
+- Log: model load start/end, memory warnings, token streaming start/stop, completion reasons, and usage stats when available.
+- Run end-to-end with a small model to validate streaming.
+
+Phase 6 — Settings & Model Lifecycle (E2E)
+- Implement `SettingsView`: show current model info, switch model (re-run selection/download if needed), and delete local bundles.
+- Ensure safe teardown of `ModelRunner` and `Conversation` when switching models; log lifecycle events.
+- Run end-to-end; validate switching and cleanup.
+
+Phase 7 — Polishing & Hardening
+- Empty/error states, accessibility, loading/typing indicators.
+- Add lightweight unit tests for persistence and catalog mapping; stabilize logs (consistent keys/values).
+- Final simulator/device passes for UX and stability.
+
+For every phase above:
+- Build and run the app in the iOS Simulator via the simulator automation.
+- Capture and review logs; fix compile/runtime issues before moving to the next phase.
+
+Definition of Done (per phase)
+- The app launches on the simulator without crashes.
+- The new capability is demonstrably usable from UI.
+- Logs include expected markers for the implemented feature.
+
+Rollbacks
+- Feature flags or conditional code paths can disable in-progress features if needed for demos.
+
+Contingencies
+- If Leap downloader APIs require separate SPM package, add it during Phase 4.
+
+Deliverables per Phase
+- Code changes, updated PRD checkbox for phase completion, and a short run log snippet.
+
+Owner’s Notes
+- Always keep the model runner singleton-like for the app session; avoid reloading for every message.
+
+## Observability & Logging
+- Use Apple Unified Logging (`os.log`) with subsystem `com.oneoffrepo.lfm2onios` and categories:
+  - `app`: app lifecycle, configuration, feature flags.
+  - `download`: model resolution, progress, completion, failures, disk checks.
+  - `runtime`: model load/unload, memory warnings, conversation lifecycle, token streaming.
+  - `ui`: navigation, user actions (sanitized), view states.
+- Include error domains/codes in logs and a compact, structured `userInfo` dictionary where helpful.
+- Add a developer “Debug Info” sheet (hidden behind a long-press or gesture) that shows last errors and current states.
+- Never log sensitive user content beyond what appears in UI; prefer redaction for prompts if needed.
 
 ## Testing & Validation
-- Build/Run via command-line automation to ensure repeatability and CI readiness.
-  - Use `xcodebuild` workflow (via our automation helper) to:
-    - List schemes
-    - Build for iOS Simulator
-    - Run on a chosen simulator and capture logs
-  - Verify first-run flow, download progress, successful `Leap.load`, and streaming responses.
+- After each phase, execute simulator automation to detect compile/runtime issues:
+  - List available simulators and choose a recent iPhone runtime.
+  - Build for the selected simulator and run the app.
+  - Capture console output and validate presence of expected log markers (`app`, `download`, `runtime`, `ui`).
+- Validate first-run flow, download progress, successful `Leap.load`, and streaming responses using small prompts.
+- Periodically build to device for performance checks once download/runtime phases are complete.
 
 ## Open Questions / Assumptions
 - Leap Model Downloader module import path: docs show `import LeapModelDownloader`. We assume it’s available via the Leap SPM or a companion package; if separate, we’ll add its SPM as well.
