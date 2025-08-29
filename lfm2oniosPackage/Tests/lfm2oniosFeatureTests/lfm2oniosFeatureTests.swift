@@ -10,7 +10,7 @@ func catalogEntries() {
 
 @Test("SelectedModel encodes and decodes via JSON")
 func selectedModelCodable() throws {
-    let original = SelectedModel(slug: "slug", displayName: "Name", provider: "Leap", quantizationSlug: nil)
+    let original = SelectedModel(slug: "slug", displayName: "Name", provider: "Leap", quantizationSlug: nil, localURL: nil)
     let data = try JSONEncoder().encode(original)
     let decoded = try JSONDecoder().decode(SelectedModel.self, from: data)
     #expect(decoded == original)

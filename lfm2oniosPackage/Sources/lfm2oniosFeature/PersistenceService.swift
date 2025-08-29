@@ -5,12 +5,14 @@ public struct SelectedModel: Codable, Equatable, Sendable {
     public let displayName: String
     public let provider: String
     public let quantizationSlug: String?
+    public let localURL: URL?
 
-    public init(slug: String, displayName: String, provider: String, quantizationSlug: String?) {
+    public init(slug: String, displayName: String, provider: String, quantizationSlug: String?, localURL: URL?) {
         self.slug = slug
         self.displayName = displayName
         self.provider = provider
         self.quantizationSlug = quantizationSlug
+        self.localURL = localURL
     }
 }
 

@@ -5,29 +5,52 @@ import SwiftUI
 public struct ContentView: View {
     @State private var persistence = PersistenceService()
     @State private var selected: SelectedModel? = nil
+    @State private var pendingSelection: ModelCatalogEntry? = nil
+    private let storage = ModelStorageService()
 
     public init() {}
 
     public var body: some View {
         NavigationStack {
             Group {
-                if let current = selected {
+                if let current = selected, current.localURL != nil {
                     ChatStubView(selected: current) {
                         persistence.clearSelectedModel()
                         selected = nil
                         print("ui: { event: \"switchModel\" }")
                     }
-                } else {
-                    ModelSelectionView { entry in
+                } else if let pending = pendingSelection {
+                    DownloadingView(entry: pending) { result in
+                        // Persist with localURL now that download finished
                         let model = SelectedModel(
-                            slug: entry.slug,
-                            displayName: entry.displayName,
-                            provider: entry.provider,
-                            quantizationSlug: entry.quantizationSlug
+                            slug: pending.slug,
+                            displayName: pending.displayName,
+                            provider: pending.provider,
+                            quantizationSlug: pending.quantizationSlug,
+                            localURL: result.localURL
                         )
                         persistence.saveSelectedModel(model)
                         selected = model
+                        pendingSelection = nil
+                    } onCancel: {
+                        pendingSelection = nil
+                    }
+                } else {
+                    ModelSelectionView { entry in
+                        pendingSelection = entry
                         print("ui: { event: \"select\", modelSlug: \"\(entry.slug)\" }")
+                    } onDelete: { entry in
+                        do {
+                            try storage.deleteDownloadedModel(entry: entry)
+                            print("download: { event: \"deleted\", modelSlug: \"\(entry.slug)\" }")
+                            if let current = selected, current.slug == entry.slug {
+                                // Clear selection if we deleted the active model
+                                persistence.clearSelectedModel()
+                                selected = nil
+                            }
+                        } catch {
+                            print("download: { event: \"deleteFailed\", error: \"\(String(describing: error))\" }")
+                        }
                     }
                 }
             }

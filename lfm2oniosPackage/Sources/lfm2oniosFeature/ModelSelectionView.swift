@@ -4,21 +4,39 @@ import SwiftUI
 @MainActor
 public struct ModelSelectionView: View {
     private let onSelect: (ModelCatalogEntry) -> Void
+    private let onDelete: (ModelCatalogEntry) -> Void
+    @State private var downloadedSet: Set<String> = []
+    private let storage = ModelStorageService()
 
-    public init(onSelect: @escaping (ModelCatalogEntry) -> Void) {
+    public init(onSelect: @escaping (ModelCatalogEntry) -> Void, onDelete: @escaping (ModelCatalogEntry) -> Void) {
         self.onSelect = onSelect
+        self.onDelete = onDelete
     }
 
     public var body: some View {
         List(ModelCatalog.all) { entry in
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(entry.displayName)
-                        .font(.headline)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline) {
+                    HStack(spacing: 6) {
+                        Text(entry.displayName)
+                            .font(.headline)
+                        if downloadedSet.contains(entry.id) {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundStyle(.green)
+                                .opacity(0.7)
+                                .imageScale(.small)
+                                .accessibilityLabel("Downloaded")
+                                .accessibilityIdentifier("downloadedLabel_\(entry.id)")
+                        }
+                    }
                     Spacer()
-                    Text("\(entry.estDownloadMB) MB")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Image(systemName: "internaldrive")
+                            .foregroundStyle(.secondary)
+                        Text("\(entry.estDownloadMB) MB")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Text(entry.shortDescription)
                     .font(.subheadline)
@@ -34,16 +52,45 @@ public struct ModelSelectionView: View {
                             .lineLimit(1)
                     }
                     Spacer()
-                    Button("Download") {
-                        onSelect(entry)
+                    if downloadedSet.contains(entry.id) {
+                        Button {
+                            onDelete(entry)
+                            refreshDownloaded()
+                        } label: {
+                            Image(systemName: "trash")
+                                .imageScale(.medium)
+                                .foregroundStyle(.red)
+                                .opacity(0.7)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Delete")
+                        .accessibilityIdentifier("deleteButton_\(entry.id)")
+                    } else {
+                        Button {
+                            onSelect(entry)
+                        } label: {
+                            Image(systemName: "arrow.down.circle")
+                                .imageScale(.medium)
+                                .foregroundStyle(.blue)
+                                .opacity(0.7)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Download")
+                        .accessibilityIdentifier("downloadButton_\(entry.id)")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("downloadButton_\(entry.id)")
                 }
             }
-            .padding(.vertical, 4)
+            // Reduce extra padding to keep rows compact
         }
         .navigationTitle("Select Model")
+        .task {
+            refreshDownloaded()
+        }
+    }
+
+    private func refreshDownloaded() {
+        let ids = ModelCatalog.all.filter { storage.isDownloaded(entry: $0) }.map { $0.id }
+        downloadedSet = Set(ids)
     }
 }
 
