@@ -63,12 +63,13 @@ public struct ModelDownloadService: ModelDownloadServicing {
         }
         #else
         // Mock fallback: simulate download and create a placeholder bundle directory
-        let totalSteps = 10
+        let totalSteps = 20
         for step in 1...totalSteps {
-            try await Task.sleep(for: .milliseconds(200))
+            try await Task.sleep(for: .milliseconds(150))
+            try Task.checkCancellation()
             let pct = Double(step) / Double(totalSteps)
             progress(pct)
-            if step % 1 == 0 {
+            if step % 2 == 0 {
                 print("download: { event: \"progress\", pct: \(Int(pct * 100)) }")
             }
         }

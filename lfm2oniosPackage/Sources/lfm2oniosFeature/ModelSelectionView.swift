@@ -3,13 +3,16 @@ import SwiftUI
 @available(iOS 17.0, macOS 13.0, *)
 @MainActor
 public struct ModelSelectionView: View {
-    private let onSelect: (ModelCatalogEntry) -> Void
+    private let onComplete: (ModelCatalogEntry, URL) -> Void
     private let onDelete: (ModelCatalogEntry) -> Void
     @State private var downloadedSet: Set<String> = []
     private let storage = ModelStorageService()
+    private let downloadService = ModelDownloadService()
+    @State private var downloading: [String: Double] = [:] // id -> 0...1
+    @State private var tasks: [String: Task<Void, Never>] = [:]
 
-    public init(onSelect: @escaping (ModelCatalogEntry) -> Void, onDelete: @escaping (ModelCatalogEntry) -> Void) {
-        self.onSelect = onSelect
+    public init(onComplete: @escaping (ModelCatalogEntry, URL) -> Void, onDelete: @escaping (ModelCatalogEntry) -> Void) {
+        self.onComplete = onComplete
         self.onDelete = onDelete
     }
 
@@ -30,12 +33,23 @@ public struct ModelSelectionView: View {
                         }
                     }
                     Spacer()
-                    HStack(spacing: 6) {
-                        Image(systemName: "internaldrive")
-                            .foregroundStyle(.secondary)
-                        Text("\(entry.estDownloadMB) MB")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    if let pct = downloading[entry.id] {
+                        HStack(spacing: 6) {
+                            ProgressView(value: pct, total: 1.0)
+                                .progressViewStyle(.linear)
+                                .frame(width: 80)
+                            Text("\(Int(pct * 100))%")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        HStack(spacing: 6) {
+                            Image(systemName: "internaldrive")
+                                .foregroundStyle(.secondary)
+                            Text("\(entry.estDownloadMB) MB")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Text(entry.shortDescription)
@@ -52,7 +66,21 @@ public struct ModelSelectionView: View {
                             .lineLimit(1)
                     }
                     Spacer()
-                    if downloadedSet.contains(entry.id) {
+                    if let _ = downloading[entry.id] {
+                        Button {
+                            tasks[entry.id]?.cancel()
+                            tasks[entry.id] = nil
+                            downloading[entry.id] = nil
+                            print("download: { event: \"cancelled\", modelSlug: \"\(entry.slug)\" }")
+                        } label: {
+                            Image(systemName: "xmark.circle")
+                                .imageScale(.medium)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Cancel")
+                        .accessibilityIdentifier("cancelButton_\(entry.id)")
+                    } else if downloadedSet.contains(entry.id) {
                         Button {
                             onDelete(entry)
                             refreshDownloaded()
@@ -67,7 +95,7 @@ public struct ModelSelectionView: View {
                         .accessibilityIdentifier("deleteButton_\(entry.id)")
                     } else {
                         Button {
-                            onSelect(entry)
+                            startDownload(entry: entry)
                         } label: {
                             Image(systemName: "arrow.down.circle")
                                 .imageScale(.medium)
@@ -91,6 +119,29 @@ public struct ModelSelectionView: View {
     private func refreshDownloaded() {
         let ids = ModelCatalog.all.filter { storage.isDownloaded(entry: $0) }.map { $0.id }
         downloadedSet = Set(ids)
+    }
+
+    private func startDownload(entry: ModelCatalogEntry) {
+        downloading[entry.id] = 0
+        let task = Task { @MainActor in
+            do {
+                let result = try await downloadService.downloadModel(entry: entry) { pct in
+                    Task { @MainActor in
+                        downloading[entry.id] = pct
+                    }
+                }
+                downloading[entry.id] = nil
+                downloadedSet.insert(entry.id)
+                onComplete(entry, result.localURL)
+                print("download: { event: \"complete:inline\", modelSlug: \"\(entry.slug)\" }")
+            } catch {
+                downloading[entry.id] = nil
+                if Task.isCancelled == false {
+                    print("download: { event: \"failed\", error: \"\(String(describing: error))\" }")
+                }
+            }
+        }
+        tasks[entry.id] = task
     }
 }
 

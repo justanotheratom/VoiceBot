@@ -5,7 +5,6 @@ import SwiftUI
 public struct ContentView: View {
     @State private var persistence = PersistenceService()
     @State private var selected: SelectedModel? = nil
-    @State private var pendingSelection: ModelCatalogEntry? = nil
     private let storage = ModelStorageService()
 
     public init() {}
@@ -19,26 +18,19 @@ public struct ContentView: View {
                         selected = nil
                         print("ui: { event: \"switchModel\" }")
                     }
-                } else if let pending = pendingSelection {
-                    DownloadingView(entry: pending) { result in
-                        // Persist with localURL now that download finished
+                } else {
+                    ModelSelectionView { entry, localURL in
+                        // Persist with localURL when inline download completes
                         let model = SelectedModel(
-                            slug: pending.slug,
-                            displayName: pending.displayName,
-                            provider: pending.provider,
-                            quantizationSlug: pending.quantizationSlug,
-                            localURL: result.localURL
+                            slug: entry.slug,
+                            displayName: entry.displayName,
+                            provider: entry.provider,
+                            quantizationSlug: entry.quantizationSlug,
+                            localURL: localURL
                         )
                         persistence.saveSelectedModel(model)
                         selected = model
-                        pendingSelection = nil
-                    } onCancel: {
-                        pendingSelection = nil
-                    }
-                } else {
-                    ModelSelectionView { entry in
-                        pendingSelection = entry
-                        print("ui: { event: \"select\", modelSlug: \"\(entry.slug)\" }")
+                        print("ui: { event: \"select:completed\", modelSlug: \"\(entry.slug)\" }")
                     } onDelete: { entry in
                         do {
                             try storage.deleteDownloadedModel(entry: entry)
