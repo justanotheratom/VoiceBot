@@ -186,10 +186,22 @@ download: { event: "complete" }
 ```
 
 Phase 4 — Real Download Integration (E2E)
-- Replace mock with Leap downloader APIs (`import LeapModelDownloader`), using either `LeapDownloadableModel.resolve` or `HuggingFaceDownloadableModel` based on catalog entry.
-- Persist downloaded model local URL or re-resolvable descriptor.
+- Replace mock with real downloads. For MVP we use public HTTPS bundle URLs from the Leap Model Library (no API key required). Inline progress + cancel in the catalog list.
+- Persist downloaded model local URL.
 - Add storage checks and user-friendly errors; log progress ticks at ~10% intervals and errors verbosely.
 - Run end-to-end; confirm file presence post-download.
+
+- Status: Done (2025-08-29) — validated on iPhone 16 Pro simulator
+- Run log snippet (real download inline):
+```
+app: { event: "launch", build: "1.0 (1)" }
+ui: { event: "rootAppear" }
+download: { event: "resolve", modelSlug: "lfm2-350m" }
+download: { event: "progress", pct: 20 }
+download: { event: "progress", pct: 50 }
+download: { event: "progress", pct: 80 }
+download: { event: "complete", modelSlug: "lfm2-350m", localPath: ".../LFM2-350M-8da4w...bundle" }
+```
 
 Phase 5 — Runtime Load & Chat (E2E)
 - Implement `ModelRuntimeService` using `Leap.load(url:)` to create a reusable `ModelRunner`.
