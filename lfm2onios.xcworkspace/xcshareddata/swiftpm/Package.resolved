@@ -1,5 +1,5 @@
 {
-  "originHash" : "21b86084b991909a265e965bcbc2506eaba07c72bf5e84f8fa30fa4ee5170dfc",
+  "originHash" : "fa08c2f3ee149799e4f33da5b4aa52e5ecfe834d1ad186ae00698e8582f7eb6a",
   "pins" : [
     {
       "identity" : "leap-ios",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "0687f71944021d616d34d922343dcef086855920",
         "version" : "600.0.1"
+      }
+    },
+    {
+      "identity" : "zipfoundation",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/weichsel/ZIPFoundation.git",
+      "state" : {
+        "revision" : "02b6abe5f6eef7e3cbd5f247c5cc24e246efcfe0",
+        "version" : "0.9.19"
       }
     }
   ],

@@ -17,7 +17,8 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/Liquid4All/leap-ios.git", from: "0.5.0")
+        .package(url: "https://github.com/Liquid4All/leap-ios.git", from: "0.5.0"),
+        .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.16")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -25,7 +26,9 @@ let package = Package(
         .target(
             name: "lfm2oniosFeature",
             dependencies: [
-                .product(name: "LeapSDK", package: "leap-ios")
+                .product(name: "LeapSDK", package: "leap-ios"),
+                .product(name: "LeapModelDownloader", package: "leap-ios"),
+                .product(name: "ZIPFoundation", package: "ZIPFoundation")
             ]
         ),
         .testTarget(

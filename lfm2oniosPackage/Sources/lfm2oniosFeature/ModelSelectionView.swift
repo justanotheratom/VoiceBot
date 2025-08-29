@@ -5,15 +5,17 @@ import SwiftUI
 public struct ModelSelectionView: View {
     private let onComplete: (ModelCatalogEntry, URL) -> Void
     private let onDelete: (ModelCatalogEntry) -> Void
+    private let onCancel: (() -> Void)?
     @State private var downloadedSet: Set<String> = []
     private let storage = ModelStorageService()
     private let downloadService = ModelDownloadService()
     @State private var downloading: [String: Double] = [:] // id -> 0...1
     @State private var tasks: [String: Task<Void, Never>] = [:]
 
-    public init(onComplete: @escaping (ModelCatalogEntry, URL) -> Void, onDelete: @escaping (ModelCatalogEntry) -> Void) {
+    public init(onComplete: @escaping (ModelCatalogEntry, URL) -> Void, onDelete: @escaping (ModelCatalogEntry) -> Void, onCancel: (() -> Void)? = nil) {
         self.onComplete = onComplete
         self.onDelete = onDelete
+        self.onCancel = onCancel
     }
 
     public var body: some View {
@@ -108,9 +110,37 @@ public struct ModelSelectionView: View {
                     }
                 }
             }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // If already downloaded and not currently downloading, treat row tap as selection
+                if downloading[entry.id] == nil && downloadedSet.contains(entry.id) {
+                    do {
+                        let url = try storage.expectedBundleURL(for: entry)
+                        onComplete(entry, url)
+                        print("ui: { event: \"select\", modelSlug: \"\(entry.slug)\" }")
+                    } catch {
+                        print("ui: { event: \"selectFailed\", error: \"\(String(describing: error))\" }")
+                    }
+                }
+            }
             // Reduce extra padding to keep rows compact
         }
         .navigationTitle("Select Model")
+        .toolbar {
+            if let onCancel {
+                #if os(iOS)
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { onCancel() }
+                        .accessibilityIdentifier("cancelSelectionButton")
+                }
+                #else
+                ToolbarItem(placement: .automatic) {
+                    Button("Cancel") { onCancel() }
+                        .accessibilityIdentifier("cancelSelectionButton")
+                }
+                #endif
+            }
+        }
         .task {
             refreshDownloaded()
         }

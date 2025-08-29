@@ -13,6 +13,12 @@ MARKETING_VERSION = 1.0
 CURRENT_PROJECT_VERSION = 1
 
 // ==========================================
+// Code Signing
+// ==========================================
+DEVELOPMENT_TEAM = 
+CODE_SIGN_STYLE = Automatic
+
+// ==========================================
 // Platform Configuration
 // ==========================================
 IPHONEOS_DEPLOYMENT_TARGET = 17.2

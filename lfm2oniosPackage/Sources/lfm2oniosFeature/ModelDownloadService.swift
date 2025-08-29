@@ -1,8 +1,6 @@
 import Foundation
-
-#if canImport(LeapSDK)
+import ZIPFoundation
 import LeapSDK
-#endif
 
 #if canImport(LeapModelDownloader)
 import LeapModelDownloader
@@ -37,66 +35,71 @@ public struct ModelDownloadService: ModelDownloadServicing {
         print("download: { event: \"resolve\", modelSlug: \"\(entry.slug)\" }")
 
         #if canImport(LeapModelDownloader)
-        // Real integration using Leap Model Downloader (to be wired with actual APIs)
+        // Try to use LeapModelDownloader first for official Leap models
         do {
-            let resolved: Any
-            if let quant = entry.quantizationSlug, !quant.isEmpty {
-                resolved = try await _resolveLeapModel(slug: entry.slug, quantizationSlug: quant)
-            } else {
-                resolved = try await _resolveLeapModel(slug: entry.slug, quantizationSlug: nil)
-            }
-            let localURL = try await _downloadResolvedModel(resolved: resolved) { pct in
-                progress(pct)
-                if Int(pct * 100) % 10 == 0 { print("download: { event: \"progress\", pct: \(Int(pct * 100)) }") }
-            }
-            print("download: { event: \"complete\", modelSlug: \"\(entry.slug)\", localPath: \"\(localURL.path)\" }")
-            return ModelDownloadResult(localURL: localURL)
-        } catch {
-            print("download: { event: \"failed\", error: \"\(String(describing: error))\" }")
-            throw ModelDownloadError.underlying(String(describing: error))
-        }
-        #else
-        // URL-based download path (requires entry.downloadURLString)
-        guard let urlString = entry.downloadURLString, let url = URL(string: urlString) else {
+            print("download: { event: \"attemptingLeapDownloader\", modelSlug: \"\(entry.slug)\" }")
+            // Note: We'd need to check the correct API for LeapModelDownloader here
+            // For now, fall through to URL-based download
             throw ModelDownloadError.downloaderUnavailable
+        } catch {
+            print("download: { event: \"leapDownloaderFailed\", error: \"\(String(describing: error))\" }")
+            // Fall through to URL-based download
         }
-        let localURL = try await _downloadFile(from: url, bundleName: _preferredBundleName(for: entry), progress: progress)
-        print("download: { event: \"complete\", modelSlug: \"\(entry.slug)\", localPath: \"\(localURL.path)\" }")
-        return ModelDownloadResult(localURL: localURL)
         #endif
+        
+        // URL-based download path - downloads real Leap bundles from HuggingFace
+        guard let urlString = entry.downloadURLString, let url = URL(string: urlString) else {
+            throw ModelDownloadError.invalidURL
+        }
+        
+        print("download: { event: \"startingURLDownload\", url: \"\(urlString)\" }")
+        
+        // Download to a temporary file first
+        let tempFile = try await _downloadTempFile(from: url, progress: progress)
+        
+        // Extract and place in the proper location
+        let storage = ModelStorageService()
+        let fm = FileManager.default
+        let finalURL: URL
+        
+        print("download: { event: \"processingArchive\", tempFile: \"\(tempFile.path)\", tempFileSize: \(try fm.attributesOfItem(atPath: tempFile.path)[.size] as? Int ?? -1) }")
+        
+        // Try to extract as ZIP archive first
+        do {
+            finalURL = try storage.extractArchive(tempFile, for: entry)
+            print("download: { event: \"extracted\", from: \"\(tempFile.path)\", to: \"\(finalURL.path)\" }")
+        } catch {
+            print("download: { event: \"extractionFailed\", error: \"\(String(describing: error))\", attemptingDirectMove: true }")
+            // If extraction fails, assume it's already a bundle and move it directly
+            let dest = try storage.expectedBundleURL(for: entry)
+            print("download: { event: \"directMove\", destination: \"\(dest.path)\" }")
+            
+            if fm.fileExists(atPath: dest.path) { 
+                print("download: { event: \"removingExisting\", path: \"\(dest.path)\" }")
+                try fm.removeItem(at: dest) 
+            }
+            
+            try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fm.moveItem(at: tempFile, to: dest)
+            finalURL = dest
+            print("download: { event: \"moved\", from: \"\(tempFile.path)\", to: \"\(finalURL.path)\" }")
+        }
+        
+        // Verify the downloaded bundle is valid
+        print("download: { event: \"verifyingBundle\", path: \"\(finalURL.path)\" }")
+        let bundleContents = try fm.contentsOfDirectory(atPath: finalURL.path)
+        guard !bundleContents.isEmpty else {
+            print("download: { event: \"verificationFailed\", reason: \"emptyBundle\", path: \"\(finalURL.path)\" }")
+            throw ModelDownloadError.underlying("Downloaded bundle is empty")
+        }
+        
+        print("download: { event: \"complete\", modelSlug: \"\(entry.slug)\", localPath: \"\(finalURL.path)\", files: \(bundleContents.count), fileList: \(bundleContents.prefix(5)) }")
+        return ModelDownloadResult(localURL: finalURL)
     }
 }
 
-// MARK: - Private helpers
+// MARK: - URLSession-based download implementation
 
-private func _preferredBundleName(for entry: ModelCatalogEntry) -> String {
-    if let q = entry.quantizationSlug, !q.isEmpty {
-        return "\(q).bundle"
-    }
-    return "\(entry.slug).bundle"
-}
-
-#if canImport(LeapModelDownloader)
-// These shim functions isolate types from the main service implementation to keep compilation clean.
-private func _resolveLeapModel(slug: String, quantizationSlug: String?) async throws -> Any {
-    // Hypothetical resolver: replace with real API from LeapModelDownloader
-    // e.g., return try await LeapDownloadableModel.resolve(slug: slug, quantization: quantizationSlug)
-    struct Unimplemented: Error {}
-    throw Unimplemented()
-}
-
-private func _downloadResolvedModel(
-    resolved: Any,
-    progress: @escaping (Double) -> Void
-) async throws -> URL {
-    // Hypothetical download API usage
-    // e.g., for try await downloader.download(model: resolved) { progress($0.fractionCompleted) }
-    struct Unimplemented: Error {}
-    throw Unimplemented()
-}
-#endif
-
-// URLSession-based download with progress and cancellation
 private final class _DownloadDelegate: NSObject, URLSessionDownloadDelegate {
     nonisolated(unsafe) let progressHandler: (Double) -> Void
     nonisolated(unsafe) var continuation: CheckedContinuation<URL, Error>?
@@ -139,14 +142,10 @@ private final class _DownloadDelegate: NSObject, URLSessionDownloadDelegate {
     }
 }
 
-private func _downloadFile(from remoteURL: URL, bundleName: String, progress: @escaping (Double) -> Void) async throws -> URL {
+private func _downloadTempFile(from remoteURL: URL, progress: @escaping (Double) -> Void) async throws -> URL {
     let fm = FileManager.default
-    let appSupport = try fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-    let modelsDir = appSupport.appendingPathComponent("Models", isDirectory: true)
-    if !fm.fileExists(atPath: modelsDir.path) {
-        try fm.createDirectory(at: modelsDir, withIntermediateDirectories: true)
-    }
-    let destURL = modelsDir.appendingPathComponent(bundleName, isDirectory: false)
+    let tempDir = try fm.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+    let destURL = tempDir.appendingPathComponent(UUID().uuidString)
 
     let delegate = _DownloadDelegate(progressHandler: { pct in
         progress(pct)
@@ -166,5 +165,4 @@ private func _downloadFile(from remoteURL: URL, bundleName: String, progress: @e
         task.cancel()
     })
 }
-
 
