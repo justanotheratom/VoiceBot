@@ -210,6 +210,14 @@ Phase 5 — Runtime Load & Chat (E2E)
 - Log: model load start/end, memory warnings, token streaming start/stop, completion reasons, and usage stats when available.
 - Run end-to-end with a small model to validate streaming.
 
+- Status: **BLOCKED** (2025-08-29) — ExecuTorch Error 34 "Failed to open bundle"
+- Issue: LeapSDK's ExecuTorch backend cannot load the downloaded model files (LFM2-350M) 
+- Error occurs on both iOS Simulator (ARM64) and physical device (iPhone)
+- Model file appears valid: 302MB, proper .pte format, correct bundle structure, readable permissions
+- Research indicates Error 34 is a model format compatibility issue with ExecuTorch runtime
+- Potential causes: model compiled with incompatible ExecuTorch version, corrupted download, or LeapSDK version mismatch
+- Next steps: Contact Liquid AI support for model compatibility, try different models, or investigate LeapSDK debug builds
+
 Phase 6 — Settings & Model Lifecycle (E2E)
 - Implement `SettingsView`: show current model info, switch model (re-run selection/download if needed), and delete local bundles.
 - Ensure safe teardown of `ModelRunner` and `Conversation` when switching models; log lifecycle events.
