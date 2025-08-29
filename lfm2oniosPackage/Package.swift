@@ -13,11 +13,17 @@ let package = Package(
             targets: ["lfm2oniosFeature"]
         ),
     ],
+    dependencies: [
+        .package(url: "https://github.com/Liquid4All/leap-ios.git", from: "0.5.0")
+    ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "lfm2oniosFeature"
+            name: "lfm2oniosFeature",
+            dependencies: [
+                .product(name: "LeapSDK", package: "leap-ios")
+            ]
         ),
         .testTarget(
             name: "lfm2oniosFeatureTests",

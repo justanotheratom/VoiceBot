@@ -10,7 +10,7 @@ Build a SwiftUI iOS application (iOS 17.2+) that runs local inference using the 
 
 ## Goals & Success Criteria
 - iOS 17.2+ SwiftUI app builds and runs on Simulator and physical device.
-- Uses LeapSDK v0.5.0+ via Swift Package Manager with both `LeapSDK` and `LeapSDKTypes` products added.
+- Uses LeapSDK v0.5.0+ via Swift Package Manager (link product `LeapSDK`).
 - First-run experience prompts user to select a model from a curated list, then downloads the model bundle on demand.
 - Chatbot UI supports streaming tokens using `Conversation.generateResponse`.
 - Model choice is persisted; app can switch models later from Settings.
@@ -75,7 +75,7 @@ Build a SwiftUI iOS application (iOS 17.2+) that runs local inference using the 
 ## Key Technical Choices
 - Leap SDK Integration
   - Add SPM package: `https://github.com/Liquid4All/leap-ios.git`, select v0.5.0+.
-  - Add both `LeapSDK` and `LeapSDKTypes` products to target (as required in v0.5.0+).
+  - Link product `LeapSDK` in the app’s Swift Package target. (Note: There is no separate `LeapSDKTypes` product in v0.5.0.)
   - Ref: Quick Start — [link](https://leap.liquid.ai/docs/edge-sdk/ios/ios-quick-start-guide)
 
 - Model Downloading
@@ -137,9 +137,16 @@ app: { event: "launch", build: "1.0 (1)" }
 ```
 
 Phase 1 — Integrate Leap SDK (Compile E2E)
-- Add SPM dependency `https://github.com/Liquid4All/leap-ios.git` (v0.5.0+), include products `LeapSDK` and `LeapSDKTypes`.
+- Add SPM dependency `https://github.com/Liquid4All/leap-ios.git` (v0.5.0+), link product `LeapSDK`.
 - Verify the app still builds and runs (even if not yet using the SDK at runtime).
 - Log successful SDK link at startup.
+
+- Status: Done (2025-08-29)
+- Run log snippet (launch):
+```
+app: { event: "launch", build: "1.0 (1)" }
+app: { event: "leap:sdkLinked", sdkVersion: "unknown" }
+```
 
 Phase 2 — Model Catalog UI (E2E)
 - Implement `ModelCatalog` (static list of 3–5 curated models with metadata from the model library).

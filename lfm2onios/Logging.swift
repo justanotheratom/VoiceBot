@@ -1,6 +1,7 @@
 import Foundation
 import os
 import os.log
+import lfm2oniosFeature
 
 enum AppLogCategory: String {
     case app
@@ -23,6 +24,15 @@ struct AppLogger {
         let legacy = OSLog(subsystem: subsystem, category: AppLogCategory.app.rawValue)
         os_log("app: { event: \"launch\", build: \"%{public}@\" }", log: legacy, type: .info, build)
         print("app: { event: \"launch\", build: \"\(build)\" }")
+
+        if LeapIntegration.isSDKAvailable {
+            let version = LeapIntegration.sdkVersionString() ?? "unknown"
+            app.info("app: { event: \"leap:sdkLinked\", sdkVersion: \"\(version)\" }")
+            print("app: { event: \"leap:sdkLinked\", sdkVersion: \"\(version)\" }")
+        } else {
+            app.error("app: { event: \"leap:sdkMissing\" }")
+            print("app: { event: \"leap:sdkMissing\" }")
+        }
     }
 
     private static func buildString() -> String {
