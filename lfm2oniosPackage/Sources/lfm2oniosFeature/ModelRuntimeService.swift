@@ -203,6 +203,28 @@ public actor ModelRuntimeService {
         }
     }
 
+    /// Safely unloads the current model and clears the conversation.
+    /// This should be called when switching models to ensure proper cleanup.
+    public func unloadModel() async {
+        print("runtime: { event: \"unload:start\", hadModel: \(modelRunner != nil), hadConversation: \(conversation != nil) }")
+        
+        conversation = nil
+        modelRunner = nil
+        loadedURL = nil
+        
+        print("runtime: { event: \"unload:complete\" }")
+    }
+    
+    /// Returns whether a model is currently loaded.
+    public var isModelLoaded: Bool {
+        return modelRunner != nil && loadedURL != nil
+    }
+    
+    /// Returns the URL of the currently loaded model, if any.
+    public var currentModelURL: URL? {
+        return loadedURL
+    }
+
     /// Streams a response for the given prompt. Calls `onToken` as partial text chunks arrive.
     /// Requires a real loaded model - no simulation fallback.
     public func streamResponse(

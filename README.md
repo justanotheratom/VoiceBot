@@ -98,11 +98,20 @@ This app integrates with [Liquid AI's Leap SDK](https://leap.liquid.ai/) for on-
 - **Inference**: Streaming chat responses via `Conversation.generateResponse`
 
 ### Key Services
+
+#### Core Service Architecture
 - `ModelCatalog`: Static catalog of available LFM2 models with metadata
 - `ModelDownloadService`: Handles model downloads with progress tracking
-- `ModelStorageService`: Manages downloaded model files and storage detection
+- `ModelStorageService`: Manages downloaded model files and storage detection  
 - `ModelRuntimeService`: Loads models and handles inference with LeapSDK
 - `PersistenceService`: Saves/loads selected model preferences
+
+#### Service Integration Patterns
+- **Actor-Based Concurrency**: `ModelRuntimeService` uses actor pattern for thread-safe model operations
+- **Async/Await**: All services use modern Swift Concurrency (no completion handlers)
+- **Dependency Injection**: Services passed as parameters, not singleton globals
+- **State Management**: SwiftUI `@State` and `@Observable` for reactive UI updates
+- **Safe Model Lifecycle**: `unloadModel()` ensures proper cleanup during model switches
 
 ### Bundle Format Support
 The app supports both directory and ZIP-based model bundles:
@@ -144,6 +153,28 @@ Common issues and solutions:
 - **Model load failures**: Ensure ZIP bundle support in storage/runtime services  
 - **Network failures**: Download service includes retry logic
 - **Storage issues**: App checks available space before downloads
+
+### UI Architecture & Navigation
+
+#### Current UI Flow (Phase 6)
+The app uses a simplified, card-based interface for model management:
+
+1. **Chat View**: Shows current model name in navigation bar with new conversation (+) and settings (⚙️) buttons
+2. **Settings View**: Displays all models as cards with inline actions - no complex navigation flows
+3. **Model Cards**: Each card shows model info with contextual buttons based on state
+
+#### Settings UI Design Pattern
+- **Visual Selection**: Selected model has blue background/border (no redundant text labels)
+- **Icon-Based Actions**: SF Symbols for all actions (download ⬇️, select ✓, delete 🗑️)
+- **State-Aware UI**: Buttons change based on model state (not downloaded → downloaded → selected)
+- **Immediate Feedback**: Model switching happens instantly with automatic settings dismissal
+
+#### Key UI Components
+- `ContentView`: Root navigation and model state management
+- `ChatView`: Conversation interface with model indicator and toolbar
+- `SettingsView`: Simplified card-based model management
+- `ModelCardView`: Individual model card with state-aware actions
+- `ModelSelectionView`: First-run model selection (legacy, used for initial setup)
 
 ### Test Structure
 - **Unit Tests**: `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/` (Swift Testing framework)

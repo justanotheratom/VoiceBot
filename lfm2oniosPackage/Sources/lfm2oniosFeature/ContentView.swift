@@ -23,6 +23,21 @@ public struct ContentView: View {
                         persistence.clearSelectedModel()
                         selected = nil
                         print("ui: { event: \"switchModel\" }")
+                    }, onSelectModel: { model in
+                        selected = model
+                        print("ui: { event: \"modelSelected\", modelSlug: \"\(model.slug)\" }")
+                    }, onDeleteModel: { entry in
+                        do {
+                            try storage.deleteDownloadedModel(entry: entry)
+                            print("download: { event: \"deleted\", modelSlug: \"\(entry.slug)\" }")
+                            if let current = selected, current.slug == entry.slug {
+                                // Clear selection if we deleted the active model
+                                persistence.clearSelectedModel()
+                                selected = nil
+                            }
+                        } catch {
+                            print("download: { event: \"deleteFailed\", error: \"\(String(describing: error))\" }")
+                        }
                     }, persistence: persistence)
                 } else {
                     ModelSelectionView { entry, localURL in
@@ -72,6 +87,8 @@ public struct ContentView: View {
 struct ChatView: View {
     let selected: SelectedModel
     let onSwitch: () -> Void
+    let onSelectModel: (SelectedModel) -> Void
+    let onDeleteModel: (ModelCatalogEntry) -> Void
     let persistence: PersistenceService
 
     @State private var runtime = ModelRuntimeService()
@@ -79,6 +96,7 @@ struct ChatView: View {
     @State private var input: String = ""
     @State private var isStreaming: Bool = false
     @State private var didAutoSend: Bool = false
+    @State private var showSettings = false
     private let storage = ModelStorageService()
 
     var body: some View {
@@ -114,21 +132,66 @@ struct ChatView: View {
             .padding()
         }
         .navigationTitle("Chat")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             #if os(iOS)
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text("Chat")
+                        .font(.headline)
+                    Text(selected.displayName)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Switch Model") { onSwitch() }
-                    .accessibilityIdentifier("switchModelButton")
+                Button(action: { showSettings = true }) {
+                    Image(systemName: "slider.horizontal.3")
+                }
+                .accessibilityIdentifier("settingsButton")
             }
             ToolbarItem(placement: .topBarLeading) {
-                Button("Clear & Restart") { 
+                Button(action: { 
                     print("ui: { event: \"clearAndRestart\" }")
-                    persistence.clearSelectedModel()
-                    onSwitch()
+                    messages.removeAll()
+                }) {
+                    Image(systemName: "plus.message")
                 }
-                .accessibilityIdentifier("clearRestartButton")
+                .accessibilityIdentifier("newConversationButton")
             }
             #endif
+        }
+        .sheet(isPresented: $showSettings) {
+            NavigationStack {
+                SettingsView(
+                    currentModel: selected,
+                    onSelectModel: { entry, url in
+                        showSettings = false
+                        Task {
+                            await runtime.unloadModel()
+                        }
+                        let model = SelectedModel(
+                            slug: entry.slug,
+                            displayName: entry.displayName,
+                            provider: entry.provider,
+                            quantizationSlug: entry.quantizationSlug,
+                            localURL: url
+                        )
+                        persistence.saveSelectedModel(model)
+                        onSelectModel(model)
+                        print("ui: { event: \"settings:modelSelected\", modelSlug: \"\(entry.slug)\" }")
+                    },
+                    onDeleteModel: onDeleteModel,
+                    persistence: persistence
+                )
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            showSettings = false
+                        }
+                    }
+                }
+            }
         }
         .task(id: selected.slug) {
             // Load the model when selection changes

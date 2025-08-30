@@ -229,6 +229,24 @@ Phase 6 — Settings & Model Lifecycle (E2E)
 - Ensure safe teardown of `ModelRunner` and `Conversation` when switching models; log lifecycle events.
 - Run end-to-end; validate switching and cleanup.
 
+- Status: Done (2025-08-30) — Simplified card-based settings UI with visual improvements
+- Implementation highlights:
+  - **Simplified Settings UI**: Replaced complex multi-section settings with clean inline model cards
+  - **Visual Model Selection**: Blue background and border clearly indicate selected model
+  - **Icon-Based Actions**: Meaningful SF Symbols for download (⬇️), select (✓), delete (🗑️) operations
+  - **Current Model Indicator**: Chat view shows selected model name in navigation bar
+  - **New Conversation Button**: Clean icon button replaces "Clear & Restart" text
+  - **Safe Model Switching**: Added `unloadModel()` method with proper ModelRunner/Conversation teardown
+- Run log snippet (settings interaction):
+```
+ui: { event: "settings:selectModel", modelSlug: "lfm2-350m" }
+runtime: { event: "unload:start", hadModel: true, hadConversation: true }
+runtime: { event: "unload:complete" }
+ui: { event: "modelSelected", modelSlug: "lfm2-350m" }
+runtime: { event: "load:start", url: "file:///.../lfm2-350m-20250710-8da4w.bundle" }
+runtime: { event: "load:success", slug: "lfm2-350m" }
+```
+
 Phase 7 — Polishing & Hardening
 - Empty/error states, accessibility, loading/typing indicators.
 - Add lightweight unit tests for persistence and catalog mapping; stabilize logs (consistent keys/values).
