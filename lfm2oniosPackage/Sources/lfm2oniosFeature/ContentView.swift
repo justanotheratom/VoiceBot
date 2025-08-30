@@ -105,126 +105,193 @@ struct ChatView: View {
     private var canSend: Bool {
         !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isStreaming
     }
+    
+    @ViewBuilder
+    private var emptyStateView: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            
+            // AI Assistant Icon with animation
+            Image(systemName: "brain.head.profile")
+                .font(.system(size: 60))
+                .foregroundStyle(.blue.gradient)
+                .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
+            
+            VStack(spacing: 8) {
+                Text("Ready to Chat")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                
+                Text("Ask me anything or start a conversation")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            
+            suggestionPillsView
+            
+            Spacer()
+        }
+        .padding()
+    }
+    
+    @ViewBuilder
+    private var suggestionPillsView: some View {
+        VStack(spacing: 12) {
+            Text("Try asking:")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 8) {
+                SuggestionPill(text: "Explain a concept") {
+                    input = "Can you explain quantum computing in simple terms?"
+                }
+                SuggestionPill(text: "Write code") {
+                    input = "Write a SwiftUI view that displays a list"
+                }
+                SuggestionPill(text: "Creative writing") {
+                    input = "Write a short story about space exploration"
+                }
+                SuggestionPill(text: "Problem solving") {
+                    input = "Help me debug this Swift code"
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    @ViewBuilder
+    private var messagesView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
+                        VStack(spacing: 12) {
+                            ChatMessageView(message: msg, isStreaming: isStreaming && msg.id == messages.last?.id)
+                                .accessibilityIdentifier("message_\(msg.id.uuidString)")
+                            
+                            // Add separator after user messages (before assistant response)
+                            if msg.role == .user && index < messages.count - 1 {
+                                Divider()
+                            }
+                        }
+                        .id(msg.id)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: messages.count) { _, _ in
+                // Scroll to bottom when new message is added
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    if let lastMessage = messages.last {
+                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: shouldScrollToBottom) { _, shouldScroll in
+                // Scroll to bottom during streaming with smooth spring animation
+                if shouldScroll, let lastMessage = messages.last {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
+                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                    shouldScrollToBottom = false
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var inputBarView: some View {
+        VStack(spacing: 0) {
+            // Subtle top border
+            Rectangle()
+                .fill(.separator.opacity(0.3))
+                .frame(height: 0.5)
+            
+            VStack(spacing: 12) {
+                HStack(alignment: .bottom, spacing: 12) {
+                    inputFieldView
+                    sendButtonView
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+            .background {
+                inputBarBackground
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var inputFieldView: some View {
+        HStack(spacing: 12) {
+            TextField("Type your message...", text: $input, axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(1...6)
+                .disabled(isStreaming)
+                .font(.body)
+            
+            if isStreaming {
+                ProgressView()
+                    .scaleEffect(0.8)
+                    .accessibilityIdentifier("typingIndicator")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background {
+            RoundedRectangle(cornerRadius: 24)
+                .fill(.quaternary.opacity(0.5))
+                .stroke(.separator.opacity(0.3), lineWidth: 1)
+        }
+    }
+    
+    @ViewBuilder
+    private var sendButtonView: some View {
+        Button(action: { send() }) {
+            Image(systemName: canSend ? "arrow.up.circle.fill" : "circle.fill")
+                .font(.system(size: 36))
+                .foregroundStyle(canSend ? .blue : .secondary)
+                .symbolEffect(.bounce, value: input)
+                .background {
+                    Circle()
+                        .fill(.background)
+                        .stroke(.separator.opacity(0.2), lineWidth: canSend ? 0 : 1)
+                }
+        }
+        .disabled(!canSend)
+        .accessibilityLabel("Send message")
+        .accessibilityIdentifier("sendButton")
+        .animation(.easeInOut(duration: 0.2), value: canSend)
+    }
+    
+    @ViewBuilder
+    private var inputBarBackground: some View {
+        Rectangle()
+            .fill(.regularMaterial)
+            .background {
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.02)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             if messages.isEmpty {
-                // Enhanced empty state with visual interest
-                VStack(spacing: 20) {
-                    Spacer()
-                    
-                    // AI Assistant Icon with animation
-                    Image(systemName: "brain.head.profile")
-                        .font(.system(size: 60))
-                        .foregroundStyle(.blue.gradient)
-                        .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
-                    
-                    VStack(spacing: 8) {
-                        Text("Ready to Chat")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.primary)
-                        
-                        Text("Ask me anything or start a conversation")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    
-                    // Suggestion pills
-                    VStack(spacing: 12) {
-                        Text("Try asking:")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                        
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 8) {
-                            SuggestionPill(text: "Explain a concept") {
-                                input = "Can you explain quantum computing in simple terms?"
-                            }
-                            SuggestionPill(text: "Write code") {
-                                input = "Write a SwiftUI view that displays a list"
-                            }
-                            SuggestionPill(text: "Creative writing") {
-                                input = "Write a short story about space exploration"
-                            }
-                            SuggestionPill(text: "Problem solving") {
-                                input = "Help me debug this Swift code"
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    
-                    Spacer()
-                }
-                .padding()
+                emptyStateView
             } else {
-                ScrollViewReader { proxy in
-                    List(messages) { msg in
-                        ChatMessageView(message: msg, isStreaming: isStreaming && msg.id == messages.last?.id)
-                            .accessibilityIdentifier("message_\(msg.id.uuidString)")
-                            .id(msg.id)
-                    }
-                    .listStyle(.plain)
-                    .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: messages.count) { _, _ in
-                        // Scroll to bottom when new message is added
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            if let lastMessage = messages.last {
-                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                    .onChange(of: shouldScrollToBottom) { _, shouldScroll in
-                        // Scroll to bottom during streaming with smooth spring animation
-                        if shouldScroll, let lastMessage = messages.last {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
-                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
-                            shouldScrollToBottom = false
-                        }
-                    }
-                }
+                messagesView
             }
-
-            // Enhanced input area with modern design
-            VStack(spacing: 0) {
-                Divider()
-                
-                HStack(spacing: 12) {
-                    HStack(spacing: 8) {
-                        TextField("Type your message...", text: $input, axis: .vertical)
-                            .textFieldStyle(.plain)
-                            .lineLimit(1...4)
-                            .disabled(isStreaming)
-                        
-                        if isStreaming {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                                .accessibilityIdentifier("typingIndicator")
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-                    
-                    Button(action: { send() }) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 32))
-                            .foregroundStyle(canSend ? .blue : .secondary)
-                            .symbolEffect(.bounce, value: input)
-                    }
-                    .disabled(!canSend)
-                    .accessibilityLabel("Send message")
-                    .accessibilityIdentifier("sendButton")
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 16)
-                .background(.regularMaterial)
-            }
+            inputBarView
         }
         .navigationTitle("Chat")
         #if os(iOS)
@@ -535,9 +602,9 @@ struct ChatMessageView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
-                // User/Assistant avatar
+                // Avatar
                 Group {
                     if message.role == .user {
                         Image(systemName: "person.circle.fill")
@@ -548,17 +615,16 @@ struct ChatMessageView: View {
                     }
                 }
                 .font(.title3)
-                .frame(width: 24)
+                .frame(width: 28, height: 28)
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(message.role == .user ? "You" : "Assistant")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fontWeight(.medium)
-                        Spacer()
-                    }
+                VStack(alignment: .leading, spacing: 6) {
+                    // Role label
+                    Text(message.role == .user ? "You" : "Assistant")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fontWeight(.medium)
                     
+                    // Message content
                     Text(message.text)
                         .font(.body)
                         .textSelection(.enabled)
@@ -566,25 +632,22 @@ struct ChatMessageView: View {
                     
                     // Streaming indicator for assistant messages
                     if message.role == .assistant && isStreaming {
-                        HStack(spacing: 6) {
-                            HStack(spacing: 2) {
+                        HStack(spacing: 8) {
+                            HStack(spacing: 3) {
                                 ForEach(0..<3) { index in
                                     Circle()
                                         .fill(.secondary)
-                                        .frame(width: 4, height: 4)
-                                        .opacity(0.3)
+                                        .frame(width: 5, height: 5)
+                                        .opacity(0.4)
                                         .animation(
                                             .easeInOut(duration: 0.6)
                                             .repeatForever(autoreverses: true)
-                                            .delay(Double(index) * 0.2),
+                                            .delay(Double(index) * 0.15),
                                             value: isStreaming
                                         )
-                                        .scaleEffect(isStreaming ? 1.2 : 1.0)
+                                        .scaleEffect(isStreaming ? 1.3 : 1.0)
                                 }
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(.regularMaterial, in: Capsule())
                             
                             Text("Assistant is typing...")
                                 .font(.caption2)
@@ -599,14 +662,14 @@ struct ChatMessageView: View {
             if message.role == .assistant, let stats = message.stats {
                 HStack {
                     Spacer()
-                        .frame(width: 36)
-                    HStack(spacing: 8) {
-                        Label("\(stats.tokens)", systemImage: "number")
+                        .frame(width: 40)
+                    HStack(spacing: 12) {
+                        Label("\(stats.tokens) tokens", systemImage: "number.circle")
                         if let ttft = stats.timeToFirstToken {
-                            Label("\(String(format: "%.2f", ttft))s", systemImage: "timer")
+                            Label("\(String(format: "%.2f", ttft))s", systemImage: "clock")
                         }
                         if let tps = stats.tokensPerSecond {
-                            Label("\(String(format: "%.1f", tps))", systemImage: "speedometer")
+                            Label("\(String(format: "%.1f", tps))/s", systemImage: "speedometer")
                         }
                     }
                     .labelStyle(.titleAndIcon)
@@ -616,6 +679,5 @@ struct ChatMessageView: View {
                 }
             }
         }
-        .padding(.vertical, 4)
     }
 }
