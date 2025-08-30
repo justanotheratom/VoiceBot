@@ -97,6 +97,7 @@ struct ChatView: View {
     @State private var isStreaming: Bool = false
     @State private var didAutoSend: Bool = false
     @State private var showSettings = false
+    @State private var streamingTask: Task<Void, Never>?
     private let storage = ModelStorageService()
     
     private var canSend: Bool {
@@ -237,8 +238,28 @@ struct ChatView: View {
             ToolbarItem(placement: .topBarLeading) {
                 Button(action: { 
                     print("DEBUG: + button tapped, clearing \(messages.count) messages")
-                    messages.removeAll()
-                    print("DEBUG: Messages cleared, now \(messages.count) messages")
+                    
+                    if isStreaming {
+                        // Clear messages immediately for instant visual feedback
+                        messages.removeAll()
+                        // Cancel the streaming task to stop further updates
+                        streamingTask?.cancel()
+                        streamingTask = nil
+                        isStreaming = false
+                        // Fully reload the model to ensure clean state after cancellation
+                        Task {
+                            if let currentURL = await runtime.currentModelURL {
+                                print("DEBUG: Reloading model after streaming cancellation")
+                                await runtime.unloadModel()
+                                try? await runtime.loadModel(at: currentURL)
+                            }
+                        }
+                        print("DEBUG: Messages cleared immediately during streaming, model will be reloaded")
+                    } else {
+                        // If not streaming, clear immediately as before
+                        messages.removeAll()
+                        print("DEBUG: Messages cleared immediately, now \(messages.count) messages")
+                    }
                 }) {
                     Image(systemName: "plus.message")
                         .font(.body)
@@ -363,7 +384,9 @@ struct ChatView: View {
         let assistantIndex = messages.count - 1
         isStreaming = true
 
-        Task { @MainActor in
+        // Store and cancel any previous streaming task
+        streamingTask?.cancel()
+        streamingTask = Task { @MainActor in
             let startTime = Date()
             var firstTokenTime: Date?
             var tokenCount = 0
@@ -371,12 +394,22 @@ struct ChatView: View {
             do {
                 try await runtime.streamResponse(prompt: prompt) { token in
                     await MainActor.run {
+                        // Check if task was cancelled or messages were cleared
+                        guard !Task.isCancelled, assistantIndex < messages.count else {
+                            return
+                        }
+                        
                         if firstTokenTime == nil {
                             firstTokenTime = Date()
                         }
                         tokenCount += 1
                         messages[assistantIndex].text += token
                     }
+                }
+                
+                // Check if task was cancelled before updating stats
+                guard !Task.isCancelled, assistantIndex < messages.count else {
+                    return
                 }
                 
                 // Calculate statistics
@@ -393,11 +426,19 @@ struct ChatView: View {
                 )
                 
                 print("runtime: { event: \"stream:userComplete\", prompt: \"\(prompt.prefix(50))...\", tokens: \(tokenCount), ttft: \(timeToFirstToken ?? 0), tps: \(tokensPerSecond ?? 0) }")
+            } catch is CancellationError {
+                print("runtime: { event: \"stream:cancelled\" }")
             } catch {
                 print("runtime: { event: \"stream:failed\", error: \"\(String(describing: error))\" }")
-                messages[assistantIndex].text = "❌ Error generating response: \(error.localizedDescription)\n\nPlease ensure the model is properly downloaded and loaded."
+                // Only update if messages still exist and index is valid
+                if assistantIndex < messages.count {
+                    messages[assistantIndex].text = "❌ Error generating response: \(error.localizedDescription)\n\nPlease ensure the model is properly downloaded and loaded."
+                }
             }
+            
+            // Always reset streaming state, even if task was cancelled
             isStreaming = false
+            streamingTask = nil
         }
     }
 }

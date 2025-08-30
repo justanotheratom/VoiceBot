@@ -731,3 +731,4 @@ struct TaskListView: View {
 ---
 
 Remember: This project prioritizes clean, simple SwiftUI code using the platform's native state management. Keep the app shell minimal and implement all features in the Swift Package.
+- if you make a functional change or bug fix, please deploy to the simulator and test the change (using xcodebuildmcp)

@@ -224,6 +224,20 @@ public actor ModelRuntimeService {
     public var currentModelURL: URL? {
         return loadedURL
     }
+    
+    /// Resets the conversation state without unloading the model.
+    /// This creates a fresh conversation with the same model, useful for clearing history after cancellation.
+    public func resetConversation() async {
+        guard let runner = modelRunner else {
+            print("runtime: { event: \"reset:noModel\" }")
+            return
+        }
+        
+        print("runtime: { event: \"reset:conversation\" }")
+        // Create a fresh conversation with empty history
+        self.conversation = Conversation(modelRunner: runner, history: [])
+        print("runtime: { event: \"reset:complete\" }")
+    }
 
     /// Streams a response for the given prompt. Calls `onToken` as partial text chunks arrive.
     /// Requires a real loaded model - no simulation fallback.
