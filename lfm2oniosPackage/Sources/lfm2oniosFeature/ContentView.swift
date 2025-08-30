@@ -242,8 +242,9 @@ struct ChatView: View {
                 }) {
                     Image(systemName: "plus.message")
                         .font(.body)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(messages.isEmpty ? Color.secondary : Color.blue)
                 }
+                .disabled(messages.isEmpty)
                 .accessibilityLabel("New Chat")
                 .accessibilityIdentifier("newChatButton")
             }
