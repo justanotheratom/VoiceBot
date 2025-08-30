@@ -38,32 +38,51 @@ public actor ModelRuntimeService {
         // Log basic file system info
         print("runtime: { event: \"load:checkingPath\", path: \"\(url.path)\", exists: \(fm.fileExists(atPath: url.path)) }")
         
-        // Verify the bundle exists and is a directory
-        guard fm.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else {
-            print("runtime: { event: \"load:failed\", error: \"bundleMissing\", path: \"\(url.path)\", exists: \(fm.fileExists(atPath: url.path)), isDirectory: \(isDir.boolValue) }")
+        // Verify the bundle exists (can be file or directory)
+        guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else {
+            print("runtime: { event: \"load:failed\", error: \"bundleMissing\", path: \"\(url.path)\", exists: false }")
             throw ModelRuntimeError.fileMissing
         }
         
-        print("runtime: { event: \"load:bundleExists\", path: \"\(url.path)\", isDirectory: true }")
-        
-        // Verify the bundle contains required files
-        let bundleContents: [String]
-        do {
-            bundleContents = try fm.contentsOfDirectory(atPath: url.path)
-            print("runtime: { event: \"load:bundleContents\", fileCount: \(bundleContents.count), files: \(bundleContents.prefix(10)) }")
-        } catch {
-            print("runtime: { event: \"load:failed\", error: \"cannotReadBundle\", path: \"\(url.path)\", underlyingError: \"\(String(describing: error))\" }")
-            throw ModelRuntimeError.fileMissing
+        if isDir.boolValue {
+            // Bundle as directory - verify contents
+            print("runtime: { event: \"load:bundleExists\", path: \"\(url.path)\", type: \"directory\" }")
+            
+            let bundleContents: [String]
+            do {
+                bundleContents = try fm.contentsOfDirectory(atPath: url.path)
+                print("runtime: { event: \"load:bundleContents\", fileCount: \(bundleContents.count), files: \(bundleContents.prefix(10)) }")
+            } catch {
+                print("runtime: { event: \"load:failed\", error: \"cannotReadBundle\", path: \"\(url.path)\", underlyingError: \"\(String(describing: error))\" }")
+                throw ModelRuntimeError.fileMissing
+            }
+            
+            guard !bundleContents.isEmpty else {
+                print("runtime: { event: \"load:failed\", error: \"emptyBundle\", path: \"\(url.path)\" }")
+                throw ModelRuntimeError.fileMissing
+            }
+            
+            print("runtime: { event: \"load:bundleVerified\", files: \(bundleContents.count) }")
+        } else {
+            // Bundle as file (ZIP archive) - verify size
+            print("runtime: { event: \"load:bundleExists\", path: \"\(url.path)\", type: \"file\" }")
+            
+            do {
+                let attrs = try fm.attributesOfItem(atPath: url.path)
+                let fileSize = attrs[.size] as? Int64 ?? 0
+                print("runtime: { event: \"load:bundleFileSize\", size: \(fileSize) }")
+                
+                guard fileSize > 1024 else {
+                    print("runtime: { event: \"load:failed\", error: \"bundleTooSmall\", size: \(fileSize) }")
+                    throw ModelRuntimeError.fileMissing
+                }
+            } catch {
+                print("runtime: { event: \"load:failed\", error: \"cannotReadBundleAttrs\", path: \"\(url.path)\", error: \"\(error.localizedDescription)\" }")
+                throw ModelRuntimeError.fileMissing
+            }
         }
         
-        guard !bundleContents.isEmpty else {
-            print("runtime: { event: \"load:failed\", error: \"emptyBundle\", path: \"\(url.path)\" }")
-            throw ModelRuntimeError.fileMissing
-        }
-        
-        print("runtime: { event: \"load:bundleVerified\", files: \(bundleContents.count) }")
-        
-        // Use the original URL directly - LeapSDK should handle spaces in paths
+        // Use the original URL directly - LeapSDK should handle both file and directory bundles
         let loadURL = url
         
         // Log warning if path contains spaces
@@ -87,61 +106,66 @@ public actor ModelRuntimeService {
         throw ModelRuntimeError.leapSDKUnavailable
         #endif
         
-        // Additional file checks before loading - check actual model files
-        let modelFiles = ["model.pte", "model.pte.enc", "config.yaml", "tokenizer.json", "tokenizer_config.json", "chat_template.jinja"]
-        for file in modelFiles {
-            let filePath = url.appendingPathComponent(file)
-            let exists = fm.fileExists(atPath: filePath.path)
-            if exists {
-                if let attrs = try? fm.attributesOfItem(atPath: filePath.path),
-                   let size = attrs[.size] as? Int {
-                    print("runtime: { event: \"load:modelFile\", file: \"\(file)\", exists: true, size: \(size) }")
+        // Additional file checks - only for directory bundles
+        if isDir.boolValue {
+            // Directory bundle - check actual model files
+            let modelFiles = ["model.pte", "model.pte.enc", "config.yaml", "tokenizer.json", "tokenizer_config.json", "chat_template.jinja"]
+            for file in modelFiles {
+                let filePath = url.appendingPathComponent(file)
+                let exists = fm.fileExists(atPath: filePath.path)
+                if exists {
+                    if let attrs = try? fm.attributesOfItem(atPath: filePath.path),
+                       let size = attrs[.size] as? Int {
+                        print("runtime: { event: \"load:modelFile\", file: \"\(file)\", exists: true, size: \(size) }")
+                    } else {
+                        print("runtime: { event: \"load:modelFile\", file: \"\(file)\", exists: true, size: \"unknown\" }")
+                    }
                 } else {
-                    print("runtime: { event: \"load:modelFile\", file: \"\(file)\", exists: true, size: \"unknown\" }")
+                    print("runtime: { event: \"load:modelFile\", file: \"\(file)\", exists: false }")
                 }
-            } else {
-                print("runtime: { event: \"load:modelFile\", file: \"\(file)\", exists: false }")
-            }
-        }
-        
-        
-        // Try to read config.yaml to understand model requirements
-        let configPath = loadURL.appendingPathComponent("config.yaml")
-        if let configData = try? Data(contentsOf: configPath),
-           let configString = String(data: configData, encoding: .utf8) {
-            print("runtime: { event: \"load:config\", content: \"\(configString.replacingOccurrences(of: "\n", with: "\\n"))\" }")
-        }
-        
-        // Validate model file integrity before loading
-        let modelPath = loadURL.appendingPathComponent("model.pte")
-        guard fm.fileExists(atPath: modelPath.path) else {
-            print("runtime: { event: \"load:failed\", error: \"modelFileNotFound\", path: \"\(modelPath.path)\" }")
-            throw ModelRuntimeError.fileMissing
-        }
-        
-        // Check model file size and basic validation
-        do {
-            let attributes = try fm.attributesOfItem(atPath: modelPath.path)
-            let fileSize = attributes[.size] as? Int64 ?? 0
-            print("runtime: { event: \"load:modelValidation\", size: \(fileSize), path: \"\(modelPath.path)\" }")
-            
-            // Model file should be at least 1MB for a valid model
-            guard fileSize > 1024 * 1024 else {
-                print("runtime: { event: \"load:failed\", error: \"modelFileTooSmall\", size: \(fileSize) }")
-                throw ModelRuntimeError.underlying("Model file is too small to be valid")
             }
             
-            // Read first 32 bytes to validate format
-            if let fileHandle = try? FileHandle(forReadingFrom: modelPath) {
-                defer { try? fileHandle.close() }
-                let headerData = fileHandle.readData(ofLength: 32)
-                let headerHex = headerData.map { String(format: "%02hhx", $0) }.joined()
-                let headerString = String(data: headerData, encoding: .ascii) ?? ""
-                print("runtime: { event: \"load:modelHeader\", headerBytes: \(headerData.count), headerHex: \"\(headerHex)\", ascii: \"\(headerString)\" }")
+            // Try to read config.yaml to understand model requirements
+            let configPath = loadURL.appendingPathComponent("config.yaml")
+            if let configData = try? Data(contentsOf: configPath),
+               let configString = String(data: configData, encoding: .utf8) {
+                print("runtime: { event: \"load:config\", content: \"\(configString.replacingOccurrences(of: "\n", with: "\\n"))\" }")
             }
-        } catch {
-            print("runtime: { event: \"load:validationFailed\", error: \"\(error)\" }")
-            throw ModelRuntimeError.fileMissing
+            
+            // Validate model file integrity before loading (directory bundles only)
+            let modelPath = loadURL.appendingPathComponent("model.pte")
+            guard fm.fileExists(atPath: modelPath.path) else {
+                print("runtime: { event: \"load:failed\", error: \"modelFileNotFound\", path: \"\(modelPath.path)\" }")
+                throw ModelRuntimeError.fileMissing
+            }
+            
+            // Check model file size and basic validation
+            do {
+                let attributes = try fm.attributesOfItem(atPath: modelPath.path)
+                let fileSize = attributes[.size] as? Int64 ?? 0
+                print("runtime: { event: \"load:modelValidation\", size: \(fileSize), path: \"\(modelPath.path)\" }")
+                
+                // Model file should be at least 1MB for a valid model
+                guard fileSize > 1024 * 1024 else {
+                    print("runtime: { event: \"load:failed\", error: \"modelFileTooSmall\", size: \(fileSize) }")
+                    throw ModelRuntimeError.underlying("Model file is too small to be valid")
+                }
+                
+                // Read first 32 bytes to validate format
+                if let fileHandle = try? FileHandle(forReadingFrom: modelPath) {
+                    defer { try? fileHandle.close() }
+                    let headerData = fileHandle.readData(ofLength: 32)
+                    let headerHex = headerData.map { String(format: "%02hhx", $0) }.joined()
+                    let headerString = String(data: headerData, encoding: .ascii) ?? ""
+                    print("runtime: { event: \"load:modelHeader\", headerBytes: \(headerData.count), headerHex: \"\(headerHex)\", ascii: \"\(headerString)\" }")
+                }
+            } catch {
+                print("runtime: { event: \"load:validationFailed\", error: \"\(error)\" }")
+                throw ModelRuntimeError.fileMissing
+            }
+        } else {
+            // File bundle (ZIP) - LeapSDK will validate contents internally
+            print("runtime: { event: \"load:skipValidation\", reason: \"zipBundle\", path: \"\(url.path)\" }")
         }
         
         // Load the model with LeapSDK - no fallback

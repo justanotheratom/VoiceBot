@@ -1,10 +1,6 @@
 import Foundation
-import ZIPFoundation
 import LeapSDK
-
-#if canImport(LeapModelDownloader)
-import LeapModelDownloader
-#endif
+@preconcurrency import LeapModelDownloader
 
 public struct ModelDownloadResult: Sendable {
     public let localURL: URL
@@ -32,137 +28,120 @@ public struct ModelDownloadService: ModelDownloadServicing {
         entry: ModelCatalogEntry,
         progress: @Sendable @escaping (Double) -> Void
     ) async throws -> ModelDownloadResult {
+        print("download: { event: \"ENTRY\", modelSlug: \"\(entry.slug)\" }")
         print("download: { event: \"resolve\", modelSlug: \"\(entry.slug)\" }")
 
-        #if canImport(LeapModelDownloader)
-        // Try to use LeapModelDownloader first for official Leap models
-        do {
-            print("download: { event: \"attemptingLeapDownloader\", modelSlug: \"\(entry.slug)\" }")
-            // Note: We'd need to check the correct API for LeapModelDownloader here
-            // For now, fall through to URL-based download
-            throw ModelDownloadError.downloaderUnavailable
-        } catch {
-            print("download: { event: \"leapDownloaderFailed\", error: \"\(String(describing: error))\" }")
-            // Fall through to URL-based download
-        }
-        #endif
-        
-        // URL-based download path - downloads real Leap bundles from HuggingFace
-        guard let urlString = entry.downloadURLString, let url = URL(string: urlString) else {
+        // Parse the filename from the download URL
+        guard let urlString = entry.downloadURLString,
+              let filename = _extractFilename(from: urlString) else {
+            print("download: { event: \"failed\", error: \"invalidURL\", url: \"\(entry.downloadURLString ?? "nil")\" }")
             throw ModelDownloadError.invalidURL
         }
         
-        print("download: { event: \"startingURLDownload\", url: \"\(urlString)\" }")
+        print("download: { event: \"creatingHuggingFaceModel\", filename: \"\(filename)\" }")
         
-        // Download to a temporary file first
-        let tempFile = try await _downloadTempFile(from: url, progress: progress)
+        // Create HuggingFace downloadable model
+        let hfModel = HuggingFaceDownloadableModel(
+            ownerName: "LiquidAI",
+            repoName: "LeapBundles", 
+            filename: filename
+        )
         
-        // Extract and place in the proper location
-        let storage = ModelStorageService()
-        let fm = FileManager.default
-        let finalURL: URL
+        print("download: { event: \"startingLeapDownload\", ownerName: \"LiquidAI\", repoName: \"LeapBundles\", filename: \"\(filename)\" }")
         
-        print("download: { event: \"processingArchive\", tempFile: \"\(tempFile.path)\", tempFileSize: \(try fm.attributesOfItem(atPath: tempFile.path)[.size] as? Int ?? -1) }")
-        
-        // Try to extract as ZIP archive first
+        // Use LeapModelDownloader
         do {
-            finalURL = try storage.extractArchive(tempFile, for: entry)
-            print("download: { event: \"extracted\", from: \"\(tempFile.path)\", to: \"\(finalURL.path)\" }")
-        } catch {
-            print("download: { event: \"extractionFailed\", error: \"\(String(describing: error))\", attemptingDirectMove: true }")
-            // If extraction fails, assume it's already a bundle and move it directly
-            let dest = try storage.expectedBundleURL(for: entry)
-            print("download: { event: \"directMove\", destination: \"\(dest.path)\" }")
+            let result = try await _downloadWithLeapDownloader(model: hfModel, progress: progress)
+            let storage = ModelStorageService()
             
-            if fm.fileExists(atPath: dest.path) { 
-                print("download: { event: \"removingExisting\", path: \"\(dest.path)\" }")
-                try fm.removeItem(at: dest) 
-            }
-            
-            try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try fm.moveItem(at: tempFile, to: dest)
-            finalURL = dest
-            print("download: { event: \"moved\", from: \"\(tempFile.path)\", to: \"\(finalURL.path)\" }")
-        }
-        
-        // Verify the downloaded bundle is valid
-        print("download: { event: \"verifyingBundle\", path: \"\(finalURL.path)\" }")
-        let bundleContents = try fm.contentsOfDirectory(atPath: finalURL.path)
-        guard !bundleContents.isEmpty else {
-            print("download: { event: \"verificationFailed\", reason: \"emptyBundle\", path: \"\(finalURL.path)\" }")
-            throw ModelDownloadError.underlying("Downloaded bundle is empty")
-        }
-        
-        print("download: { event: \"complete\", modelSlug: \"\(entry.slug)\", localPath: \"\(finalURL.path)\", files: \(bundleContents.count), fileList: \(bundleContents.prefix(5)) }")
-        return ModelDownloadResult(localURL: finalURL)
-    }
-}
-
-// MARK: - URLSession-based download implementation
-
-private final class _DownloadDelegate: NSObject, URLSessionDownloadDelegate {
-    nonisolated(unsafe) let progressHandler: (Double) -> Void
-    nonisolated(unsafe) var continuation: CheckedContinuation<URL, Error>?
-    nonisolated(unsafe) var destinationURL: URL?
-
-    init(progressHandler: @escaping (Double) -> Void) {
-        self.progressHandler = progressHandler
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard totalBytesExpectedToWrite > 0 else { return }
-        let pct = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        progressHandler(pct)
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        guard let dest = destinationURL else {
-            continuation?.resume(throwing: ModelDownloadError.underlying("Missing destination URL"))
-            continuation = nil
-            return
-        }
-        do {
+            // Move to expected location for consistency with storage service
+            let expectedURL = try storage.expectedBundleURL(for: entry)
             let fm = FileManager.default
-            if fm.fileExists(atPath: dest.path) {
-                try fm.removeItem(at: dest)
+            
+            // Remove existing if present
+            if fm.fileExists(atPath: expectedURL.path) {
+                try fm.removeItem(at: expectedURL)
             }
-            try fm.moveItem(at: location, to: dest)
-            continuation?.resume(returning: dest)
+            
+            // Create parent directory if needed
+            try fm.createDirectory(at: expectedURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            
+            // Move downloaded bundle to expected location
+            try fm.moveItem(at: result, to: expectedURL)
+            
+            print("download: { event: \"complete\", modelSlug: \"\(entry.slug)\", localPath: \"\(expectedURL.path)\" }")
+            return ModelDownloadResult(localURL: expectedURL)
         } catch {
-            continuation?.resume(throwing: error)
+            print("download: { event: \"failed\", modelSlug: \"\(entry.slug)\", error: \"\(String(describing: error))\" }")
+            throw ModelDownloadError.underlying("LeapModelDownloader failed: \(error.localizedDescription)")
         }
-        continuation = nil
     }
-
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let error = error {
-            continuation?.resume(throwing: error)
-            continuation = nil
+    
+    private func _downloadWithLeapDownloader(model: HuggingFaceDownloadableModel, progress: @Sendable @escaping (Double) -> Void) async throws -> URL {
+        print("download: { event: \"creatingDownloader\", model: \"\(model.filename)\" }")
+        
+        // Create a LeapModelDownloader instance  
+        let downloader = ModelDownloader()
+        
+        print("download: { event: \"requestingDownload\", model: \"\(model.filename)\" }")
+        
+        // Start the download request
+        downloader.requestDownloadModel(model)
+        
+        // Poll for progress updates
+        var lastProgress: Double = 0
+        while true {
+            let status = await downloader.queryStatus(model)
+            
+            switch status {
+            case .notOnLocal:
+                print("download: { event: \"statusNotOnLocal\", model: \"\(model.filename)\" }")
+                // Continue polling - download may still be starting
+                try await Task.sleep(for: .milliseconds(500))
+                
+            case .downloadInProgress(let currentProgress):
+                if currentProgress != lastProgress {
+                    lastProgress = currentProgress
+                    progress(currentProgress)
+                    print("download: { event: \"progress\", model: \"\(model.filename)\", progress: \(Int(currentProgress * 100))% }")
+                }
+                try await Task.sleep(for: .milliseconds(200)) // Poll every 200ms
+                
+            case .downloaded:
+                progress(1.0)
+                print("download: { event: \"statusDownloaded\", model: \"\(model.filename)\" }")
+                let url = downloader.getModelFile(model)
+                print("download: { event: \"leapDownloadSuccess\", url: \"\(url.path)\" }")
+                return url
+                
+            @unknown default:
+                print("download: { event: \"unknownStatus\", model: \"\(model.filename)\" }")
+                try await Task.sleep(for: .milliseconds(500))
+            }
+            
+            // Check for task cancellation
+            if Task.isCancelled {
+                throw ModelDownloadError.cancelled
+            }
         }
     }
 }
 
-private func _downloadTempFile(from remoteURL: URL, progress: @escaping (Double) -> Void) async throws -> URL {
-    let fm = FileManager.default
-    let tempDir = try fm.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-    let destURL = tempDir.appendingPathComponent(UUID().uuidString)
+// MARK: - Helper functions
 
-    let delegate = _DownloadDelegate(progressHandler: { pct in
-        progress(pct)
-        if Int(pct * 100) % 10 == 0 { print("download: { event: \"progress\", pct: \(Int(pct * 100)) }") }
-    })
-    let cfg = URLSessionConfiguration.default
-    let session = URLSession(configuration: cfg, delegate: delegate, delegateQueue: nil)
-    let task = session.downloadTask(with: remoteURL)
-
-    return try await withTaskCancellationHandler(operation: {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
-            delegate.continuation = continuation
-            delegate.destinationURL = destURL
-            task.resume()
+private func _extractFilename(from urlString: String) -> String? {
+    // Extract filename from HuggingFace URL
+    // URL format: https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2-350M-8da4w_output_8da8w-seq_4096.bundle?download=true
+    guard let url = URL(string: urlString) else { return nil }
+    
+    let pathComponents = url.pathComponents
+    // Find the component that ends with .bundle
+    for component in pathComponents.reversed() {
+        if component.hasSuffix(".bundle") {
+            return component
         }
-    }, onCancel: {
-        task.cancel()
-    })
+    }
+    
+    return nil
 }
 

@@ -110,7 +110,6 @@ public struct ModelSelectionView: View {
                     }
                 }
             }
-            .contentShape(Rectangle())
             .onTapGesture {
                 // If already downloaded and not currently downloading, treat row tap as selection
                 if downloading[entry.id] == nil && downloadedSet.contains(entry.id) {

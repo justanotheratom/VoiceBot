@@ -87,6 +87,64 @@ targets: [
 ]
 ```
 
+## Project-Specific Implementation Details
+
+### LLM Integration (Leap SDK)
+This app integrates with [Liquid AI's Leap SDK](https://leap.liquid.ai/) for on-device LLM inference:
+
+- **SDK**: LeapSDK v0.5.0+ via Swift Package Manager
+- **Models**: LFM2 family models (350M, 700M, 1.2B parameters)
+- **Download**: Uses `LeapModelDownloader` for on-demand model downloads
+- **Inference**: Streaming chat responses via `Conversation.generateResponse`
+
+### Key Services
+- `ModelCatalog`: Static catalog of available LFM2 models with metadata
+- `ModelDownloadService`: Handles model downloads with progress tracking
+- `ModelStorageService`: Manages downloaded model files and storage detection
+- `ModelRuntimeService`: Loads models and handles inference with LeapSDK
+- `PersistenceService`: Saves/loads selected model preferences
+
+### Bundle Format Support
+The app supports both directory and ZIP-based model bundles:
+- **Directory bundles**: Traditional `.bundle` folders with model files
+- **ZIP bundles**: Compressed `.bundle` files downloaded by LeapModelDownloader
+- Storage and runtime services automatically detect and handle both formats
+
+### Download Progress Implementation
+Progress tracking uses LeapModelDownloader's polling API:
+```swift
+// Start download
+downloader.requestDownloadModel(model)
+
+// Poll for progress
+let status = await downloader.queryStatus(model)
+switch status {
+case .downloadInProgress(let progress):
+    updateProgressUI(progress) // 0.0 to 1.0
+case .downloaded:
+    // Download complete
+}
+```
+
+### Model Storage
+- **Location**: `Application Support/Models/`  
+- **Format**: `{quantization-slug}.bundle` (e.g., `lfm2-350m-20250710-8da4w.bundle`)
+- **Size**: Models range from ~320MB (350M) to ~920MB (1.2B)
+- **Detection**: Handles both file and directory bundles transparently
+
+### Performance Characteristics
+- **Model Load Time**: ~0.33 seconds (LFM2-350M)
+- **Inference Speed**: ~127 tokens/second (iPhone simulator)
+- **Memory**: Models use ~300-900MB depending on size
+- **Context Window**: 4,096 tokens for all LFM2 models
+
+### Error Handling
+Common issues and solutions:
+- **Download stuck at 0%**: Fixed by using `requestDownloadModel()` + polling
+- **Model load failures**: Ensure ZIP bundle support in storage/runtime services  
+- **Network failures**: Download service includes retry logic
+- **Storage issues**: App checks available space before downloads
+
 ### Test Structure
 - **Unit Tests**: `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/` (Swift Testing framework)
 - **UI Tests**: `lfm2oniosUITests/` (XCUITest framework)

@@ -22,7 +22,7 @@ public struct ModelStorageService: Sendable {
         } else {
             name = "\(entry.slug).bundle"
         }
-        let bundleURL = root.appendingPathComponent(name, isDirectory: true)
+        let bundleURL = root.appendingPathComponent(name, isDirectory: false)
         print("storage: { event: \"expectedBundleURL\", slug: \"\(entry.slug)\", quantization: \"\(entry.quantizationSlug ?? "none")\", name: \"\(name)\", root: \"\(root.path)\", fullPath: \"\(bundleURL.path)\" }")
         return bundleURL
     }
@@ -36,20 +36,34 @@ public struct ModelStorageService: Sendable {
             let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
             print("storage: { event: \"isDownloaded:pathCheck\", exists: \(exists), isDirectory: \(isDir.boolValue) }")
             
-            guard exists, isDir.boolValue else {
-                print("storage: { event: \"isDownloaded:result\", result: false, reason: \"notExistsOrNotDir\" }")
+            guard exists else {
+                print("storage: { event: \"isDownloaded:result\", result: false, reason: \"notExists\" }")
                 return false
             }
             
-            // Lightweight sanity: bundle should contain at least one file
-            if let contents = try? FileManager.default.contentsOfDirectory(atPath: url.path) {
-                let hasFiles = !contents.isEmpty
-                print("storage: { event: \"isDownloaded:contentsCheck\", fileCount: \(contents.count), hasFiles: \(hasFiles) }")
-                return hasFiles
+            if isDir.boolValue {
+                // Bundle as directory - check it has files
+                if let contents = try? FileManager.default.contentsOfDirectory(atPath: url.path) {
+                    let hasFiles = !contents.isEmpty
+                    print("storage: { event: \"isDownloaded:contentsCheck\", fileCount: \(contents.count), hasFiles: \(hasFiles) }")
+                    return hasFiles
+                } else {
+                    print("storage: { event: \"isDownloaded:result\", result: false, reason: \"cannotReadDirContents\" }")
+                    return false
+                }
+            } else {
+                // Bundle as file (ZIP archive) - check file size and that it's readable
+                do {
+                    let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+                    let fileSize = attrs[.size] as? Int64 ?? 0
+                    let isValid = fileSize > 1024 // At least 1KB
+                    print("storage: { event: \"isDownloaded:fileCheck\", fileSize: \(fileSize), isValid: \(isValid) }")
+                    return isValid
+                } catch {
+                    print("storage: { event: \"isDownloaded:result\", result: false, reason: \"cannotReadFileAttrs\", error: \"\(error.localizedDescription)\" }")
+                    return false
+                }
             }
-            
-            print("storage: { event: \"isDownloaded:result\", result: false, reason: \"cannotReadContents\" }")
-            return false
         } catch {
             print("storage: { event: \"isDownloaded:error\", error: \"\(String(describing: error))\" }")
             return false
@@ -63,18 +77,6 @@ public struct ModelStorageService: Sendable {
         }
     }
 
-    // Extract a ZIP archive into the bundle directory, replacing any existing content
-    public func extractArchive(_ archiveURL: URL, for entry: ModelCatalogEntry) throws -> URL {
-        let dest = try expectedBundleURL(for: entry)
-        let fm = FileManager.default
-        if fm.fileExists(atPath: dest.path) {
-            try fm.removeItem(at: dest)
-        }
-        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
-        // Use ZIPFoundation to extract. If it fails, bubble up to allow caller to fall back.
-        try fm.unzipItem(at: archiveURL, to: dest)
-        return dest
-    }
 }
 
 
