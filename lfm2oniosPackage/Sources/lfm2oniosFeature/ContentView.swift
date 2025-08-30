@@ -102,13 +102,34 @@ struct ChatView: View {
     var body: some View {
         VStack(spacing: 0) {
             List(messages) { msg in
-                HStack(alignment: .top) {
-                    Text(msg.role == .user ? "You" : "Assistant")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 72, alignment: .leading)
-                    Text(msg.text)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .top) {
+                        Text(msg.role == .user ? "You" : "Assistant")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 72, alignment: .leading)
+                        Text(msg.text)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    
+                    if msg.role == .assistant, let stats = msg.stats {
+                        HStack {
+                            Spacer()
+                                .frame(width: 72)
+                            HStack(spacing: 8) {
+                                Text("\(stats.tokens) tokens")
+                                if let ttft = stats.timeToFirstToken {
+                                    Text("ttft: \(String(format: "%.2f", ttft))s")
+                                }
+                                if let tps = stats.tokensPerSecond {
+                                    Text("tps: \(String(format: "%.1f", tps))")
+                                }
+                            }
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            Spacer()
+                        }
+                    }
                 }
                 .accessibilityIdentifier("message_\(msg.id.uuidString)")
             }
@@ -132,7 +153,9 @@ struct ChatView: View {
             .padding()
         }
         .navigationTitle("Chat")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             #if os(iOS)
             ToolbarItem(placement: .principal) {
@@ -185,11 +208,19 @@ struct ChatView: View {
                     persistence: persistence
                 )
                 .toolbar {
+                    #if os(iOS)
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Done") {
                             showSettings = false
                         }
                     }
+                    #else
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Done") {
+                            showSettings = false
+                        }
+                    }
+                    #endif
                 }
             }
         }
@@ -263,13 +294,35 @@ struct ChatView: View {
         isStreaming = true
 
         Task { @MainActor in
+            let startTime = Date()
+            var firstTokenTime: Date?
+            var tokenCount = 0
+            
             do {
                 try await runtime.streamResponse(prompt: prompt) { token in
                     await MainActor.run {
+                        if firstTokenTime == nil {
+                            firstTokenTime = Date()
+                        }
+                        tokenCount += 1
                         messages[assistantIndex].text += token
                     }
                 }
-                print("runtime: { event: \"stream:userComplete\", prompt: \"\(prompt.prefix(50))...\" }")
+                
+                // Calculate statistics
+                let endTime = Date()
+                let totalTime = endTime.timeIntervalSince(startTime)
+                let timeToFirstToken = firstTokenTime?.timeIntervalSince(startTime)
+                let tokensPerSecond = tokenCount > 0 && totalTime > 0 ? Double(tokenCount) / totalTime : nil
+                
+                // Update message with stats
+                messages[assistantIndex].stats = TokenStats(
+                    tokens: tokenCount,
+                    timeToFirstToken: timeToFirstToken,
+                    tokensPerSecond: tokensPerSecond
+                )
+                
+                print("runtime: { event: \"stream:userComplete\", prompt: \"\(prompt.prefix(50))...\", tokens: \(tokenCount), ttft: \(timeToFirstToken ?? 0), tps: \(tokensPerSecond ?? 0) }")
             } catch {
                 print("runtime: { event: \"stream:failed\", error: \"\(String(describing: error))\" }")
                 messages[assistantIndex].text = "❌ Error generating response: \(error.localizedDescription)\n\nPlease ensure the model is properly downloaded and loaded."
@@ -281,15 +334,29 @@ struct ChatView: View {
 
 // MARK: - Chat models
 
+struct TokenStats: Equatable, Sendable {
+    let tokens: Int
+    let timeToFirstToken: TimeInterval?
+    let tokensPerSecond: Double?
+    
+    init(tokens: Int, timeToFirstToken: TimeInterval? = nil, tokensPerSecond: Double? = nil) {
+        self.tokens = tokens
+        self.timeToFirstToken = timeToFirstToken
+        self.tokensPerSecond = tokensPerSecond
+    }
+}
+
 struct Message: Identifiable, Equatable, Sendable {
     enum Role: String, Sendable { case user, assistant }
     let id: UUID
     let role: Role
     var text: String
+    var stats: TokenStats?
 
-    init(id: UUID = UUID(), role: Role, text: String) {
+    init(id: UUID = UUID(), role: Role, text: String, stats: TokenStats? = nil) {
         self.id = id
         self.role = role
         self.text = text
+        self.stats = stats
     }
 }

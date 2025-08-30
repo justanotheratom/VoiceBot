@@ -1,6 +1,10 @@
 import SwiftUI
 import Foundation
 
+#if os(iOS)
+import UIKit
+#endif
+
 @available(iOS 17.0, macOS 13.0, *)
 @MainActor
 public struct SettingsView: View {
@@ -43,12 +47,16 @@ public struct SettingsView: View {
                         },
                         onCancel: { cancelDownload(entry) }
                     )
+                    .accessibilityIdentifier("modelCard_\(entry.slug)")
                 }
             }
             .padding()
         }
         .navigationTitle("Models")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
+        #endif
+        .accessibilityLabel("Models list. Choose a model to download and use for conversations.")
         .task {
             await loadDownloadStates()
         }
@@ -87,12 +95,12 @@ public struct SettingsView: View {
         guard let state = downloadStates[entry.slug],
               case .downloaded(let url) = state else { return }
         
-        print("ui: { event: \"settings:selectModel\", modelSlug: \"\(entry.slug)\" }")
+        AppLogger.logSettingsAction(action: "selectModel", modelSlug: entry.slug)
         onSelectModel(entry, url)
     }
     
     private func downloadModel(_ entry: ModelCatalogEntry) {
-        print("ui: { event: \"settings:downloadModel\", modelSlug: \"\(entry.slug)\" }")
+        AppLogger.logDownloadStart(modelSlug: entry.slug, quantization: entry.quantizationSlug)
         downloadStates[entry.slug] = .inProgress(progress: 0.0)
         
         Task {
@@ -100,30 +108,31 @@ public struct SettingsView: View {
                 let result = try await downloadService.downloadModel(entry: entry) { progress in
                     Task { @MainActor in
                         downloadStates[entry.slug] = .inProgress(progress: progress)
+                        AppLogger.logDownloadProgress(modelSlug: entry.slug, progress: progress)
                     }
                 }
                 await MainActor.run {
                     downloadStates[entry.slug] = .downloaded(localURL: result.localURL)
-                    print("ui: { event: \"settings:downloadComplete\", modelSlug: \"\(entry.slug)\" }")
+                    AppLogger.logDownloadComplete(modelSlug: entry.slug, localPath: result.localURL.path)
                 }
             } catch {
                 await MainActor.run {
                     downloadStates[entry.slug] = .failed(error: error.localizedDescription)
-                    print("ui: { event: \"settings:downloadFailed\", modelSlug: \"\(entry.slug)\", error: \"\(error.localizedDescription)\" }")
+                    AppLogger.logDownloadFailed(modelSlug: entry.slug, error: error)
                 }
             }
         }
     }
     
     private func cancelDownload(_ entry: ModelCatalogEntry) {
-        print("ui: { event: \"settings:cancelDownload\", modelSlug: \"\(entry.slug)\" }")
+        AppLogger.logSettingsAction(action: "cancelDownload", modelSlug: entry.slug)
         // Note: ModelDownloadService doesn't currently support cancellation
         // For now, just reset the state
         downloadStates[entry.slug] = .notStarted
     }
     
     private func deleteModel(_ entry: ModelCatalogEntry) {
-        print("ui: { event: \"settings:deleteModel\", modelSlug: \"\(entry.slug)\" }")
+        AppLogger.logSettingsAction(action: "deleteModel", modelSlug: entry.slug)
         onDeleteModel(entry)
         downloadStates[entry.slug] = .notStarted
     }
@@ -139,6 +148,44 @@ struct ModelCardView: View {
     let onDelete: () -> Void
     let onCancel: () -> Void
     
+    private var cardAccessibilityLabel: String {
+        var label = "\(entry.displayName) by \(entry.provider). \(entry.shortDescription). Size: \(entry.estDownloadMB) MB. Context: \(entry.contextWindow) tokens."
+        
+        if isSelected {
+            label += " Currently selected."
+        }
+        
+        switch downloadState {
+        case .notStarted:
+            label += " Not downloaded."
+        case .inProgress(let progress):
+            label += " Downloading: \(Int(progress * 100)) percent complete."
+        case .downloaded:
+            label += " Downloaded and ready to use."
+        case .failed(let error):
+            label += " Download failed: \(error)"
+        }
+        
+        return label
+    }
+    
+    private var cardAccessibilityHint: String {
+        switch downloadState {
+        case .notStarted:
+            return "Tap download button to download this model"
+        case .inProgress:
+            return "Download in progress. You can cancel if needed"
+        case .downloaded:
+            if isSelected {
+                return "This model is currently selected for conversations"
+            } else {
+                return "Tap select button to use this model, or delete button to remove it"
+            }
+        case .failed:
+            return "Download failed. Tap retry button to try again"
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header with name
@@ -146,12 +193,20 @@ struct ModelCardView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(entry.displayName)
                         .font(.headline)
+                        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
                     Text(entry.provider)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .accessibilityLabel("Provider: \(entry.provider)")
                 }
                 
                 Spacer()
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.blue)
+                        .accessibilityLabel("Currently selected model")
+                }
             }
             
             // Details
@@ -161,8 +216,10 @@ struct ModelCardView: View {
             
             HStack {
                 Label("\(entry.estDownloadMB) MB", systemImage: "externaldrive")
+                    .accessibilityLabel("Download size: \(entry.estDownloadMB) megabytes")
                 Spacer()
                 Label("\(entry.contextWindow) tokens", systemImage: "text.alignleft")
+                    .accessibilityLabel("Context window: \(entry.contextWindow) tokens")
             }
             .font(.caption)
             .foregroundStyle(.tertiary)
@@ -179,6 +236,8 @@ struct ModelCardView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
+                    .accessibilityLabel("Download \(entry.displayName)")
+                    .accessibilityHint("Downloads the model to your device")
                     
                 case .inProgress(let progress):
                     VStack(alignment: .leading, spacing: 4) {
@@ -194,12 +253,15 @@ struct ModelCardView: View {
                             }
                             .font(.caption)
                             .foregroundColor(.red)
+                            .accessibilityLabel("Cancel download of \(entry.displayName)")
                         }
                         ProgressView(value: progress)
                             .progressViewStyle(LinearProgressViewStyle())
+                            .accessibilityLabel("Download progress: \(Int(progress * 100)) percent")
                         Text("\(Int(progress * 100))%")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
                     }
                     
                 case .downloaded:
@@ -211,6 +273,8 @@ struct ModelCardView: View {
                         .controlSize(.small)
                         .disabled(true)
                         .foregroundColor(.green)
+                        .accessibilityLabel("Currently selected model")
+                        .accessibilityHint("This model is already selected")
                     } else {
                         Button(action: onSelect) {
                             HStack(spacing: 4) {
@@ -220,6 +284,8 @@ struct ModelCardView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
+                        .accessibilityLabel("Select \(entry.displayName)")
+                        .accessibilityHint("Choose this model for conversations")
                     }
                     
                     if !isSelected {
@@ -229,6 +295,8 @@ struct ModelCardView: View {
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                         .foregroundColor(.red)
+                        .accessibilityLabel("Delete \(entry.displayName)")
+                        .accessibilityHint("Remove this model from your device to free up space")
                     }
                     
                 case .failed(let error):
@@ -239,9 +307,11 @@ struct ModelCardView: View {
                         }
                         .font(.caption)
                         .foregroundColor(.red)
+                        .accessibilityLabel("Download failed for \(entry.displayName)")
                         Text(error)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .accessibilityLabel("Error: \(error)")
                         Button(action: onDownload) {
                             HStack(spacing: 4) {
                                 Image(systemName: "arrow.clockwise.circle")
@@ -250,6 +320,8 @@ struct ModelCardView: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                        .accessibilityLabel("Retry downloading \(entry.displayName)")
+                        .accessibilityHint("Try downloading this model again")
                     }
                 }
                 
@@ -257,12 +329,21 @@ struct ModelCardView: View {
             }
         }
         .padding()
-        .background(isSelected ? Color.blue.opacity(0.1) : Color(.systemGray6))
+        .background(isSelected ? Color.blue.opacity(0.1) : {
+            #if os(iOS)
+            Color(UIColor.systemGray6)
+            #else
+            Color.gray.opacity(0.2)
+            #endif
+        }())
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(isSelected ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 2)
         )
         .cornerRadius(12)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(cardAccessibilityLabel)
+        .accessibilityHint(cardAccessibilityHint)
     }
 }
 

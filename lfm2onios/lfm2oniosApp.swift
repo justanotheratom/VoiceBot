@@ -4,7 +4,7 @@ import lfm2oniosFeature
 @main
 struct lfm2oniosApp: App {
     init() {
-        AppLogger.logLaunch()
+        print("app: { event: \"launch\", build: \"1.0 (1)\" }")
         // Handle automation flags as early as possible so ContentView sees persisted state
         let args = ProcessInfo.processInfo.arguments
         if args.contains("--ui-test-clean-reset") {
@@ -39,7 +39,6 @@ struct lfm2oniosApp: App {
         WindowGroup {
             ContentView()
                 .onAppear {
-                    AppLogger.ui.info("ui: { event: \"rootAppear\" }")
                     print("ui: { event: \"rootAppear\" }")
                     // Optional clean reset for automated runs
                     if ProcessInfo.processInfo.arguments.contains("--ui-test-clean-reset") {

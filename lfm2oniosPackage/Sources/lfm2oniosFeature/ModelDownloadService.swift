@@ -97,7 +97,7 @@ public struct ModelDownloadService: ModelDownloadServicing {
             case .notOnLocal:
                 print("download: { event: \"statusNotOnLocal\", model: \"\(model.filename)\" }")
                 // Continue polling - download may still be starting
-                try await Task.sleep(for: .milliseconds(500))
+                try await Task.sleep(nanoseconds: 500_000_000)
                 
             case .downloadInProgress(let currentProgress):
                 if currentProgress != lastProgress {
@@ -105,7 +105,7 @@ public struct ModelDownloadService: ModelDownloadServicing {
                     progress(currentProgress)
                     print("download: { event: \"progress\", model: \"\(model.filename)\", progress: \(Int(currentProgress * 100))% }")
                 }
-                try await Task.sleep(for: .milliseconds(200)) // Poll every 200ms
+                try await Task.sleep(nanoseconds: 200_000_000) // Poll every 200ms
                 
             case .downloaded:
                 progress(1.0)
@@ -116,7 +116,7 @@ public struct ModelDownloadService: ModelDownloadServicing {
                 
             @unknown default:
                 print("download: { event: \"unknownStatus\", model: \"\(model.filename)\" }")
-                try await Task.sleep(for: .milliseconds(500))
+                try await Task.sleep(nanoseconds: 500_000_000)
             }
             
             // Check for task cancellation
