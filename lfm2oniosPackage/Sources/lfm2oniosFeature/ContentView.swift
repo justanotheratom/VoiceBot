@@ -98,59 +98,110 @@ struct ChatView: View {
     @State private var didAutoSend: Bool = false
     @State private var showSettings = false
     private let storage = ModelStorageService()
+    
+    private var canSend: Bool {
+        !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isStreaming
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            List(messages) { msg in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top) {
-                        Text(msg.role == .user ? "You" : "Assistant")
-                            .font(.caption)
+            if messages.isEmpty {
+                // Enhanced empty state with visual interest
+                VStack(spacing: 20) {
+                    Spacer()
+                    
+                    // AI Assistant Icon with animation
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 60))
+                        .foregroundStyle(.blue.gradient)
+                        .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
+                    
+                    VStack(spacing: 8) {
+                        Text("Ready to Chat")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
+                        
+                        Text("Ask me anything or start a conversation")
+                            .font(.body)
                             .foregroundStyle(.secondary)
-                            .frame(width: 72, alignment: .leading)
-                        Text(msg.text)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .multilineTextAlignment(.center)
                     }
                     
-                    if msg.role == .assistant, let stats = msg.stats {
-                        HStack {
-                            Spacer()
-                                .frame(width: 72)
-                            HStack(spacing: 8) {
-                                Text("\(stats.tokens) tokens")
-                                if let ttft = stats.timeToFirstToken {
-                                    Text("ttft: \(String(format: "%.2f", ttft))s")
-                                }
-                                if let tps = stats.tokensPerSecond {
-                                    Text("tps: \(String(format: "%.1f", tps))")
-                                }
-                            }
-                            .font(.caption2)
+                    // Suggestion pills
+                    VStack(spacing: 12) {
+                        Text("Try asking:")
+                            .font(.caption)
                             .foregroundStyle(.tertiary)
-                            Spacer()
+                        
+                        LazyVGrid(columns: [
+                            GridItem(.flexible()),
+                            GridItem(.flexible())
+                        ], spacing: 8) {
+                            SuggestionPill(text: "Explain a concept") {
+                                input = "Can you explain quantum computing in simple terms?"
+                            }
+                            SuggestionPill(text: "Write code") {
+                                input = "Write a SwiftUI view that displays a list"
+                            }
+                            SuggestionPill(text: "Creative writing") {
+                                input = "Write a short story about space exploration"
+                            }
+                            SuggestionPill(text: "Problem solving") {
+                                input = "Help me debug this Swift code"
+                            }
                         }
                     }
+                    .padding(.horizontal, 20)
+                    
+                    Spacer()
                 }
-                .accessibilityIdentifier("message_\(msg.id.uuidString)")
+                .padding()
+            } else {
+                List(messages) { msg in
+                    ChatMessageView(message: msg)
+                        .accessibilityIdentifier("message_\(msg.id.uuidString)")
+                }
+                .listStyle(.plain)
+                .scrollDismissesKeyboard(.interactively)
             }
-            .listStyle(.plain)
 
-            HStack(spacing: 8) {
-                TextField("Message", text: $input)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityIdentifier("chatInputField")
-                    .disabled(isStreaming)
-
-                if isStreaming {
-                    ProgressView()
-                        .accessibilityIdentifier("typingIndicator")
-                }
-
-                Button("Send") { send() }
-                    .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isStreaming)
+            // Enhanced input area with modern design
+            VStack(spacing: 0) {
+                Divider()
+                
+                HStack(spacing: 12) {
+                    HStack(spacing: 8) {
+                        TextField("Type your message...", text: $input, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .lineLimit(1...4)
+                            .disabled(isStreaming)
+                        
+                        if isStreaming {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .accessibilityIdentifier("typingIndicator")
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+                    
+                    Button(action: { send() }) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 32))
+                            .foregroundStyle(canSend ? .blue : .secondary)
+                            .symbolEffect(.bounce, value: input)
+                    }
+                    .disabled(!canSend)
+                    .accessibilityLabel("Send message")
                     .accessibilityIdentifier("sendButton")
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+                .background(.regularMaterial)
             }
-            .padding()
         }
         .navigationTitle("Chat")
         #if os(iOS)
@@ -160,27 +211,41 @@ struct ChatView: View {
             #if os(iOS)
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text("Chat")
-                        .font(.headline)
+                    HStack(spacing: 6) {
+                        Image(systemName: "brain.head.profile")
+                            .foregroundStyle(.blue)
+                            .font(.caption)
+                        Text("Chat")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                    }
                     Text(selected.displayName)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: { showSettings = true }) {
                     Image(systemName: "slider.horizontal.3")
+                        .font(.body)
+                        .foregroundStyle(.blue)
                 }
+                .accessibilityLabel("Settings")
                 .accessibilityIdentifier("settingsButton")
             }
             ToolbarItem(placement: .topBarLeading) {
                 Button(action: { 
-                    print("ui: { event: \"clearAndRestart\" }")
+                    print("DEBUG: + button tapped, clearing \(messages.count) messages")
                     messages.removeAll()
+                    print("DEBUG: Messages cleared, now \(messages.count) messages")
                 }) {
                     Image(systemName: "plus.message")
+                        .font(.body)
+                        .foregroundStyle(.blue)
                 }
-                .accessibilityIdentifier("newConversationButton")
+                .accessibilityLabel("New Chat")
+                .accessibilityIdentifier("newChatButton")
             }
             #endif
         }
@@ -287,9 +352,13 @@ struct ChatView: View {
     private func send() {
         let prompt = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty else { return }
-        input = ""
-        messages.append(Message(role: .user, text: prompt))
-        messages.append(Message(role: .assistant, text: ""))
+        
+        withAnimation(.easeInOut(duration: 0.2)) {
+            input = ""
+            messages.append(Message(role: .user, text: prompt))
+            messages.append(Message(role: .assistant, text: ""))
+        }
+        
         let assistantIndex = messages.count - 1
         isStreaming = true
 
@@ -358,5 +427,84 @@ struct Message: Identifiable, Equatable, Sendable {
         self.role = role
         self.text = text
         self.stats = stats
+    }
+}
+
+// MARK: - Helper Views
+
+struct SuggestionPill: View {
+    let text: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(text)
+                .font(.caption)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.regularMaterial, in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct ChatMessageView: View {
+    let message: Message
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 12) {
+                // User/Assistant avatar
+                Group {
+                    if message.role == .user {
+                        Image(systemName: "person.circle.fill")
+                            .foregroundStyle(.blue)
+                    } else {
+                        Image(systemName: "brain.head.profile")
+                            .foregroundStyle(.green)
+                    }
+                }
+                .font(.title3)
+                .frame(width: 24)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(message.role == .user ? "You" : "Assistant")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fontWeight(.medium)
+                        Spacer()
+                    }
+                    
+                    Text(message.text)
+                        .font(.body)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            
+            // Performance stats for assistant messages
+            if message.role == .assistant, let stats = message.stats {
+                HStack {
+                    Spacer()
+                        .frame(width: 36)
+                    HStack(spacing: 8) {
+                        Label("\(stats.tokens)", systemImage: "number")
+                        if let ttft = stats.timeToFirstToken {
+                            Label("\(String(format: "%.2f", ttft))s", systemImage: "timer")
+                        }
+                        if let tps = stats.tokensPerSecond {
+                            Label("\(String(format: "%.1f", tps))", systemImage: "speedometer")
+                        }
+                    }
+                    .labelStyle(.titleAndIcon)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    Spacer()
+                }
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
