@@ -98,6 +98,8 @@ struct ChatView: View {
     @State private var didAutoSend: Bool = false
     @State private var showSettings = false
     @State private var streamingTask: Task<Void, Never>?
+    @State private var shouldScrollToBottom = false
+    @State private var scrollTimer: Timer?
     private let storage = ModelStorageService()
     
     private var canSend: Bool {
@@ -159,12 +161,32 @@ struct ChatView: View {
                 }
                 .padding()
             } else {
-                List(messages) { msg in
-                    ChatMessageView(message: msg)
-                        .accessibilityIdentifier("message_\(msg.id.uuidString)")
+                ScrollViewReader { proxy in
+                    List(messages) { msg in
+                        ChatMessageView(message: msg, isStreaming: isStreaming && msg.id == messages.last?.id)
+                            .accessibilityIdentifier("message_\(msg.id.uuidString)")
+                            .id(msg.id)
+                    }
+                    .listStyle(.plain)
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: messages.count) { _, _ in
+                        // Scroll to bottom when new message is added
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            if let lastMessage = messages.last {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
+                        }
+                    }
+                    .onChange(of: shouldScrollToBottom) { _, shouldScroll in
+                        // Scroll to bottom during streaming with smooth spring animation
+                        if shouldScroll, let lastMessage = messages.last {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
+                            shouldScrollToBottom = false
+                        }
+                    }
                 }
-                .listStyle(.plain)
-                .scrollDismissesKeyboard(.interactively)
             }
 
             // Enhanced input area with modern design
@@ -384,6 +406,16 @@ struct ChatView: View {
         let assistantIndex = messages.count - 1
         isStreaming = true
 
+        // Start smooth scroll timer during streaming
+        scrollTimer?.invalidate()
+        scrollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            Task { @MainActor in
+                if isStreaming {
+                    shouldScrollToBottom = true
+                }
+            }
+        }
+
         // Store and cancel any previous streaming task
         streamingTask?.cancel()
         streamingTask = Task { @MainActor in
@@ -437,6 +469,8 @@ struct ChatView: View {
             }
             
             // Always reset streaming state, even if task was cancelled
+            scrollTimer?.invalidate()
+            scrollTimer = nil
             isStreaming = false
             streamingTask = nil
         }
@@ -493,6 +527,12 @@ struct SuggestionPill: View {
 
 struct ChatMessageView: View {
     let message: Message
+    let isStreaming: Bool
+    
+    init(message: Message, isStreaming: Bool = false) {
+        self.message = message
+        self.isStreaming = isStreaming
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -523,6 +563,35 @@ struct ChatMessageView: View {
                         .font(.body)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    // Streaming indicator for assistant messages
+                    if message.role == .assistant && isStreaming {
+                        HStack(spacing: 6) {
+                            HStack(spacing: 2) {
+                                ForEach(0..<3) { index in
+                                    Circle()
+                                        .fill(.secondary)
+                                        .frame(width: 4, height: 4)
+                                        .opacity(0.3)
+                                        .animation(
+                                            .easeInOut(duration: 0.6)
+                                            .repeatForever(autoreverses: true)
+                                            .delay(Double(index) * 0.2),
+                                            value: isStreaming
+                                        )
+                                        .scaleEffect(isStreaming ? 1.2 : 1.0)
+                                }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.regularMaterial, in: Capsule())
+                            
+                            Text("Assistant is typing...")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 4)
+                    }
                 }
             }
             
