@@ -319,6 +319,20 @@ struct ChatView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 16) {
+                    #if DEBUG
+                    Button(action: { 
+                        Task { @MainActor in
+                            await UITestDataCreator.createTestConversations()
+                        }
+                    }) {
+                        Image(systemName: "testtube.2")
+                            .font(.body)
+                            .foregroundStyle(.orange)
+                    }
+                    .accessibilityLabel("Create Test Data")
+                    .accessibilityIdentifier("createTestDataButton")
+                    #endif
+                    
                     Button(action: { showingConversationHistory = true }) {
                         Image(systemName: "clock.arrow.circlepath")
                             .font(.body)
