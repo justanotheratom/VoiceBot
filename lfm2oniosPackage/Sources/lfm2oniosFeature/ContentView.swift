@@ -100,6 +100,7 @@ struct ChatView: View {
     @State private var streamingTask: Task<Void, Never>?
     @State private var shouldScrollToBottom = false
     @State private var scrollTimer: Timer?
+    @State private var showingConversationHistory = false
     private let storage = ModelStorageService()
     
     private var canSend: Bool {
@@ -316,13 +317,23 @@ struct ChatView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: { showSettings = true }) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.body)
-                        .foregroundStyle(.blue)
+                HStack(spacing: 16) {
+                    Button(action: { showingConversationHistory = true }) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.body)
+                            .foregroundStyle(.blue)
+                    }
+                    .accessibilityLabel("Conversation History")
+                    .accessibilityIdentifier("historyButton")
+                    
+                    Button(action: { showSettings = true }) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.body)
+                            .foregroundStyle(.blue)
+                    }
+                    .accessibilityLabel("Settings")
+                    .accessibilityIdentifier("settingsButton")
                 }
-                .accessibilityLabel("Settings")
-                .accessibilityIdentifier("settingsButton")
             }
             ToolbarItem(placement: .topBarLeading) {
                 Button(action: { 
@@ -398,6 +409,13 @@ struct ChatView: View {
                     }
                     #endif
                 }
+            }
+        }
+        .sheet(isPresented: $showingConversationHistory) {
+            ConversationListView { conversation in
+                // Handle conversation selection - for now just print
+                print("ui: { event: \"conversationSelected\", id: \"\(conversation.id)\", title: \"\(conversation.title)\" }")
+                // TODO: Load conversation messages and integrate with chat
             }
         }
         .task(id: selected.slug) {
