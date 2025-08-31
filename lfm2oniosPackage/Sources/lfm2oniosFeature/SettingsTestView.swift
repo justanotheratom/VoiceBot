@@ -56,7 +56,9 @@ public struct SettingsTestView: View {
                 }
             }
             .navigationTitle("Models")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
         }
     }
     

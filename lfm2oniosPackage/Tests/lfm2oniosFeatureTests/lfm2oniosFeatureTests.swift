@@ -168,3 +168,82 @@ func messageWithTokenStats() {
     let userMessage = Message(role: .user, text: "Hi there")
     #expect(userMessage.stats == nil)
 }
+
+@Test("ConversationService persistence works correctly")
+func conversationPersistence() async throws {
+    let service = ConversationService()
+    let message = ChatMessageModel(role: .user, content: "Test message")
+    var conversation = ChatConversation(modelSlug: "test-model", initialMessage: message)
+    
+    // Save and load
+    try service.saveConversation(conversation)
+    let loaded = try service.loadConversation(id: conversation.id)
+    
+    #expect(loaded.id == conversation.id)
+    #expect(loaded.messages.count == 1)
+    #expect(loaded.messages.first?.content == "Test message")
+    #expect(loaded.modelSlug == "test-model")
+    #expect(loaded.title == "New Conversation")
+    
+    // Test updating conversation
+    conversation.addMessage(ChatMessageModel(role: .assistant, content: "Test response"))
+    conversation.setTitle("Updated Title")
+    try service.saveConversation(conversation)
+    
+    let updatedLoaded = try service.loadConversation(id: conversation.id)
+    #expect(updatedLoaded.messages.count == 2)
+    #expect(updatedLoaded.title == "Updated Title")
+    
+    // Test loading all conversations
+    let allConversations = service.loadAllConversations()
+    #expect(allConversations.contains { $0.id == conversation.id })
+    
+    // Cleanup
+    try service.deleteConversation(id: conversation.id)
+}
+
+@Test("ChatConversation model methods work correctly")
+func chatConversationModel() {
+    var conversation = ChatConversation(modelSlug: "test-model")
+    
+    // Test initial state
+    #expect(conversation.title == "New Conversation")
+    #expect(conversation.messages.isEmpty)
+    #expect(conversation.archivedMessages.isEmpty)
+    #expect(conversation.modelSlug == "test-model")
+    
+    // Test adding messages
+    let message1 = ChatMessageModel(role: .user, content: "Hello", tokenCount: 5)
+    let message2 = ChatMessageModel(role: .assistant, content: "Hi there", tokenCount: 10)
+    
+    conversation.addMessage(message1)
+    conversation.addMessage(message2)
+    
+    #expect(conversation.messages.count == 2)
+    #expect(conversation.totalTokenCount == 15)
+    #expect(conversation.allMessages.count == 2)
+    
+    // Test archiving messages
+    conversation.archiveOldMessages([message1])
+    #expect(conversation.messages.count == 1)
+    #expect(conversation.archivedMessages.count == 1)
+    #expect(conversation.allMessages.count == 2)
+    
+    // Test title setting
+    conversation.setTitle("Test Conversation")
+    #expect(conversation.title == "Test Conversation")
+}
+
+@Test("ChatMessageModel works correctly")
+func chatMessageModel() {
+    let message = ChatMessageModel(role: .user, content: "Test message", tokenCount: 5)
+    
+    #expect(message.role == .user)
+    #expect(message.content == "Test message")
+    #expect(message.tokenCount == 5)
+    #expect(message.id != UUID())
+    
+    let message2 = ChatMessageModel(role: .assistant, content: "Response")
+    #expect(message2.tokenCount == nil)
+    #expect(message != message2)
+}
