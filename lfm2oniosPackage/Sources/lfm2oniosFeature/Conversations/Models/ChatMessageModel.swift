@@ -14,4 +14,9 @@ struct ChatMessageModel: Codable, Identifiable, Equatable {
         self.timestamp = Date()
         self.tokenCount = tokenCount
     }
+    
+    mutating func estimateAndSetTokenCount() {
+        let manager = ContextWindowManager()
+        self.tokenCount = manager.estimateTokenCount(content)
+    }
 }

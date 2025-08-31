@@ -247,3 +247,91 @@ func chatMessageModel() {
     #expect(message2.tokenCount == nil)
     #expect(message != message2)
 }
+
+@Test("ChatMessageModel token estimation works correctly")
+func chatMessageTokenEstimation() {
+    var message = ChatMessageModel(role: .user, content: "Hello world test message")
+    #expect(message.tokenCount == nil)
+    
+    message.estimateAndSetTokenCount()
+    #expect(message.tokenCount != nil)
+    #expect(message.tokenCount! > 0)
+}
+
+@Test("ContextWindowManager token estimation works")
+func contextWindowManagerTokenEstimation() {
+    let manager = ContextWindowManager()
+    
+    // Test token estimation
+    let tokenCount = manager.estimateTokenCount("Hello world")
+    #expect(tokenCount > 0)
+    #expect(tokenCount == 2) // 2 words * 1.3 = 2.6 -> 2 tokens (Int conversion truncates)
+    
+    // Test empty string
+    let emptyCount = manager.estimateTokenCount("")
+    #expect(emptyCount == 1) // Minimum 1 token
+    
+    // Test longer text
+    let longCount = manager.estimateTokenCount("This is a longer test message with more words")
+    #expect(longCount > tokenCount)
+}
+
+@Test("ContextWindowManager context limits work")
+func contextWindowManagerLimits() {
+    let manager = ContextWindowManager()
+    
+    // Test known models
+    #expect(manager.getContextLimit(for: "lfm2-350m") == 4096)
+    #expect(manager.getContextLimit(for: "lfm2-700m") == 4096)
+    #expect(manager.getContextLimit(for: "lfm2-1.2b") == 4096)
+    
+    // Test unknown model defaults to 4096
+    #expect(manager.getContextLimit(for: "unknown-model") == 4096)
+}
+
+@Test("ContextWindowManager archiving logic works")
+func contextWindowManagerArchiving() {
+    let manager = ContextWindowManager()
+    
+    // Create a conversation with many messages to trigger archiving
+    var conversation = ChatConversation(modelSlug: "lfm2-350m")
+    
+    // Add messages that would exceed 70% of available context
+    // Available for history: 4096 - (4096 * 0.3) = 2867 tokens
+    // 70% threshold: 2867 * 0.7 = 2006 tokens
+    // We'll add messages to exceed this
+    
+    for i in 1...50 {
+        let message = ChatMessageModel(role: .user, content: "This is test message number \(i) with some additional content", tokenCount: 50)
+        conversation.addMessage(message)
+    }
+    
+    // Should recommend archiving at this point
+    #expect(manager.shouldArchiveMessages(in: conversation))
+    
+    // Get messages to archive
+    let messagesToArchive = manager.getMessagesToArchive(from: conversation)
+    #expect(!messagesToArchive.isEmpty)
+    #expect(messagesToArchive.count < conversation.messages.count) // Should keep some messages
+}
+
+@Test("ContextWindowManager preserves recent messages")
+func contextWindowManagerPreservesRecent() {
+    let manager = ContextWindowManager()
+    var conversation = ChatConversation(modelSlug: "lfm2-350m")
+    
+    // Add old messages
+    for i in 1...10 {
+        let message = ChatMessageModel(role: .user, content: "Old message \(i)", tokenCount: 200)
+        conversation.addMessage(message)
+    }
+    
+    // Add recent important message
+    let recentMessage = ChatMessageModel(role: .user, content: "Recent important message", tokenCount: 50)
+    conversation.addMessage(recentMessage)
+    
+    let messagesToArchive = manager.getMessagesToArchive(from: conversation)
+    
+    // The recent message should not be in the archive list
+    #expect(!messagesToArchive.contains { $0.id == recentMessage.id })
+}
