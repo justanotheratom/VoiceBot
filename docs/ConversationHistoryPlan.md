@@ -225,11 +225,22 @@ import Testing
 
 ---
 
-## Phase 2: Context Window Management (4-5 hours)
+## Phase 2: Context Window Management ✅ COMPLETED
+
+**Status**: ✅ **COMPLETED** - All Phase 2 items implemented and tested
+**Time**: 3 hours (faster than estimated 4-5 hours)
+**Tests**: All unit tests passing ✅
+
+**Implementation Notes**:
+- Created comprehensive ContextWindowManager with smart archiving logic
+- Added token estimation method to ChatMessageModel
+- Implemented 70% threshold for archiving with 30% reserved for responses
+- Added 5 comprehensive unit tests covering all scenarios
+- All tests pass, app builds and runs successfully on simulator
 
 ### Implementation Checklist
 
-#### □ Create `ContextWindowManager.swift` in Services folder
+#### ✅ Create `ContextWindowManager.swift` in Services folder
 ```swift
 import Foundation
 import os.log
@@ -308,7 +319,7 @@ struct ContextWindowManager {
 }
 ```
 
-#### □ Update `ChatMessage.swift` to include token estimation
+#### ✅ Update `ChatMessage.swift` to include token estimation
 Add this method to `ChatMessage`:
 ```swift
 mutating func estimateAndSetTokenCount() {
@@ -317,7 +328,7 @@ mutating func estimateAndSetTokenCount() {
 }
 ```
 
-#### □ Add Unit Tests for Context Management
+#### ✅ Add Unit Tests for Context Management
 Add to `ConversationServiceTests.swift`:
 ```swift
 @Test func contextWindowManagement() async throws {
