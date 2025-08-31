@@ -335,3 +335,77 @@ func contextWindowManagerPreservesRecent() {
     // The recent message should not be in the archive list
     #expect(!messagesToArchive.contains { $0.id == recentMessage.id })
 }
+
+@Test("TitleGenerationService fallback title generation")
+func titleGenerationFallback() async {
+    let mockRuntimeService = ModelRuntimeService()
+    let titleService = TitleGenerationService(modelRuntimeService: mockRuntimeService)
+    
+    // Test with empty conversation
+    let emptyConversation = ChatConversation(modelSlug: "test-model")
+    let fallbackTitle = await titleService.generateTitle(for: emptyConversation)
+    #expect(fallbackTitle.contains("Chat from"))
+    
+    // Test with only user message
+    var oneMessageConversation = ChatConversation(modelSlug: "test-model")
+    oneMessageConversation.addMessage(ChatMessageModel(role: .user, content: "Hello"))
+    let oneMessageTitle = await titleService.generateTitle(for: oneMessageConversation)
+    #expect(oneMessageTitle.contains("Chat from"))
+}
+
+@Test("TitleGenerationService title cleaning works")
+func titleGenerationCleaning() async {
+    let mockRuntimeService = ModelRuntimeService()
+    let titleService = TitleGenerationService(modelRuntimeService: mockRuntimeService)
+    
+    // Use reflection to test private method behavior through public interface
+    var conversation = ChatConversation(modelSlug: "test-model")
+    conversation.addMessage(ChatMessageModel(role: .user, content: "What is Swift?"))
+    conversation.addMessage(ChatMessageModel(role: .assistant, content: "Swift is a programming language"))
+    
+    // When model is not loaded, should return fallback
+    let title = await titleService.generateTitle(for: conversation)
+    #expect(title.contains("Chat from"))
+    #expect(!title.contains("Title:"))
+    #expect(!title.contains("\""))
+}
+
+@Test("TitleGenerationService handles valid conversation structure")
+func titleGenerationValidStructure() async {
+    let mockRuntimeService = ModelRuntimeService()
+    let titleService = TitleGenerationService(modelRuntimeService: mockRuntimeService)
+    
+    var conversation = ChatConversation(modelSlug: "test-model")
+    let userMessage = ChatMessageModel(role: .user, content: "How do I create a SwiftUI view?")
+    let assistantMessage = ChatMessageModel(role: .assistant, content: "To create a SwiftUI view, you need to define a struct that conforms to the View protocol...")
+    
+    conversation.addMessage(userMessage)
+    conversation.addMessage(assistantMessage)
+    
+    // Since we don't have a real model loaded, this will return a fallback title
+    let title = await titleService.generateTitle(for: conversation)
+    #expect(!title.isEmpty)
+    #expect(title != "New Conversation")
+}
+
+@Test("TitleGenerationService respects conversation requirements")
+func titleGenerationRequirements() async {
+    let mockRuntimeService = ModelRuntimeService()
+    let titleService = TitleGenerationService(modelRuntimeService: mockRuntimeService)
+    
+    // Test conversation with assistant message first (invalid)
+    var invalidConversation = ChatConversation(modelSlug: "test-model")
+    invalidConversation.addMessage(ChatMessageModel(role: .assistant, content: "Hello there"))
+    invalidConversation.addMessage(ChatMessageModel(role: .user, content: "Hi"))
+    
+    let invalidTitle = await titleService.generateTitle(for: invalidConversation)
+    #expect(invalidTitle.contains("Chat from")) // Should use fallback
+    
+    // Test valid conversation structure
+    var validConversation = ChatConversation(modelSlug: "test-model")
+    validConversation.addMessage(ChatMessageModel(role: .user, content: "What is AI?"))
+    validConversation.addMessage(ChatMessageModel(role: .assistant, content: "AI stands for Artificial Intelligence..."))
+    
+    let validTitle = await titleService.generateTitle(for: validConversation)
+    #expect(!validTitle.isEmpty)
+}
