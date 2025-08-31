@@ -337,6 +337,7 @@ func contextWindowManagerPreservesRecent() {
 }
 
 @Test("TitleGenerationService fallback title generation")
+@MainActor
 func titleGenerationFallback() async {
     let mockRuntimeService = ModelRuntimeService()
     let titleService = TitleGenerationService(modelRuntimeService: mockRuntimeService)
@@ -354,6 +355,7 @@ func titleGenerationFallback() async {
 }
 
 @Test("TitleGenerationService title cleaning works")
+@MainActor
 func titleGenerationCleaning() async {
     let mockRuntimeService = ModelRuntimeService()
     let titleService = TitleGenerationService(modelRuntimeService: mockRuntimeService)
@@ -371,6 +373,7 @@ func titleGenerationCleaning() async {
 }
 
 @Test("TitleGenerationService handles valid conversation structure")
+@MainActor
 func titleGenerationValidStructure() async {
     let mockRuntimeService = ModelRuntimeService()
     let titleService = TitleGenerationService(modelRuntimeService: mockRuntimeService)
@@ -389,6 +392,7 @@ func titleGenerationValidStructure() async {
 }
 
 @Test("TitleGenerationService respects conversation requirements")
+@MainActor
 func titleGenerationRequirements() async {
     let mockRuntimeService = ModelRuntimeService()
     let titleService = TitleGenerationService(modelRuntimeService: mockRuntimeService)

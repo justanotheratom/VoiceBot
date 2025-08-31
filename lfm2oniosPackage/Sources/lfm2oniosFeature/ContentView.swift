@@ -92,6 +92,7 @@ struct ChatView: View {
     let persistence: PersistenceService
 
     @State private var runtime = ModelRuntimeService()
+    @State private var conversationManager: ConversationManager?
     @State private var messages: [Message] = []
     @State private var input: String = ""
     @State private var isStreaming: Bool = false
@@ -360,6 +361,9 @@ struct ChatView: View {
                         messages.removeAll()
                         print("DEBUG: Messages cleared immediately, now \(messages.count) messages")
                     }
+                    
+                    // Start a new conversation
+                    conversationManager?.startNewConversation(modelSlug: selected.slug)
                 }) {
                     Image(systemName: "plus.message")
                         .font(.body)
@@ -413,9 +417,9 @@ struct ChatView: View {
         }
         .sheet(isPresented: $showingConversationHistory) {
             ConversationListView { conversation in
-                // Handle conversation selection - for now just print
+                loadConversation(conversation)
+                showingConversationHistory = false
                 print("ui: { event: \"conversationSelected\", id: \"\(conversation.id)\", title: \"\(conversation.title)\" }")
-                // TODO: Load conversation messages and integrate with chat
             }
         }
         .task(id: selected.slug) {
@@ -459,6 +463,10 @@ struct ChatView: View {
                 print("runtime: { event: \"load:attempting\", slug: \"\(selected.slug)\", url: \"\(urlToLoad.path)\", urlExists: \(FileManager.default.fileExists(atPath: urlToLoad.path)) }")
                 try await runtime.loadModel(at: urlToLoad)
                 print("runtime: { event: \"load:success\", slug: \"\(selected.slug)\" }")
+                
+                // Initialize conversation manager after successful model load
+                conversationManager = ConversationManager(modelRuntimeService: runtime)
+                conversationManager?.startNewConversation(modelSlug: selected.slug)
             } catch {
                 print("runtime: { event: \"load:failed\", slug: \"\(selected.slug)\", error: \"\(String(describing: error))\", errorType: \"\(type(of: error))\" }")
                 // Show error to user - no fallback to simulation
@@ -487,6 +495,9 @@ struct ChatView: View {
             messages.append(Message(role: .user, text: prompt))
             messages.append(Message(role: .assistant, text: ""))
         }
+        
+        // Add user message to conversation manager
+        conversationManager?.addUserMessage(prompt)
         
         let assistantIndex = messages.count - 1
         isStreaming = true
@@ -542,6 +553,12 @@ struct ChatView: View {
                     tokensPerSecond: tokensPerSecond
                 )
                 
+                // Add assistant response to conversation manager
+                let assistantResponse = messages[assistantIndex].text
+                Task { @MainActor in
+                    await conversationManager?.addAssistantMessage(assistantResponse)
+                }
+                
                 print("runtime: { event: \"stream:userComplete\", prompt: \"\(prompt.prefix(50))...\", tokens: \(tokenCount), ttft: \(timeToFirstToken ?? 0), tps: \(tokensPerSecond ?? 0) }")
             } catch is CancellationError {
                 print("runtime: { event: \"stream:cancelled\" }")
@@ -559,6 +576,22 @@ struct ChatView: View {
             isStreaming = false
             streamingTask = nil
         }
+    }
+    
+    private func loadConversation(_ conversation: ChatConversation) {
+        // Clear current messages
+        messages.removeAll()
+        
+        // Load conversation in manager
+        conversationManager?.loadConversation(conversation)
+        
+        // Convert ChatMessageModel to UI Message format and display
+        let conversationMessages = conversationManager?.getAllMessagesForDisplay() ?? []
+        messages = conversationMessages.map { chatMessage in
+            Message(role: chatMessage.role == .user ? .user : .assistant, text: chatMessage.content)
+        }
+        
+        print("ui: { event: \"conversationLoaded\", id: \"\(conversation.id)\", messageCount: \(messages.count) }")
     }
 }
 

@@ -15,6 +15,7 @@ private actor TitleAccumulator {
 }
 
 @Observable
+@MainActor
 class TitleGenerationService {
     private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "title")
     private let modelRuntimeService: ModelRuntimeService
