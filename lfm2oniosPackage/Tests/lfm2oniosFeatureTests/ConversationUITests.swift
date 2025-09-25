@@ -176,35 +176,3 @@ func debugConversationServicePath() {
         print("DEBUG: Error saving conversation: \(error)")
     }
 }
-
-// Function to create test conversations in the simulator for manual testing
-func createTestConversationsForSimulator() throws {
-    let service = ConversationService()
-    
-    let conversations = [
-        createTestConversation(
-            title: "SwiftUI Basics",
-            userContent: "How do I get started with SwiftUI?", 
-            assistantContent: "SwiftUI is Apple's declarative framework for building user interfaces. To get started, you'll want to create a new Xcode project...",
-            modelSlug: "lfm2-350m"
-        ),
-        createTestConversation(
-            title: "iOS Architecture Patterns",
-            userContent: "What are the best architecture patterns for iOS apps?",
-            assistantContent: "There are several popular architecture patterns for iOS development: MVC, MVP, MVVM, VIPER, and the newer SwiftUI patterns...",
-            modelSlug: "lfm2-700m"
-        ),
-        createTestConversation(
-            title: "Core Data vs SwiftData",
-            userContent: "Should I use Core Data or SwiftData for my new iOS app?",
-            assistantContent: "SwiftData is Apple's newer framework that provides a more modern, Swift-native approach to data persistence...",
-            modelSlug: "lfm2-1.2b"
-        )
-    ]
-    
-    for conversation in conversations {
-        try service.saveConversation(conversation)
-    }
-    
-    print("Created \(conversations.count) test conversations for UI testing")
-}
