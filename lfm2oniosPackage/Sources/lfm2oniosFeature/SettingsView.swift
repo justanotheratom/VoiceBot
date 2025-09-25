@@ -495,7 +495,7 @@ struct CleanModelRow: View {
                 Label("Downloaded", systemImage: "checkmark.circle")
                     .labelStyle(.iconOnly)
                     .foregroundStyle(.blue)
-            case .inProgress(let progress):
+            case .inProgress(_):
                 Label("Downloading", systemImage: "arrow.down.circle.fill")
                     .labelStyle(.iconOnly)
                     .foregroundStyle(.blue)

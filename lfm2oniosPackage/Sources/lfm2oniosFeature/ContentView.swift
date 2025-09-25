@@ -95,6 +95,7 @@ struct ChatView: View {
     @State private var conversationManager: ConversationManager?
     @State private var messages: [Message] = []
     @State private var input: String = ""
+    @FocusState private var isInputFocused: Bool
     @State private var isStreaming: Bool = false
     @State private var didAutoSend: Bool = false
     @State private var showSettings = false
@@ -136,6 +137,10 @@ struct ChatView: View {
             Spacer()
         }
         .padding()
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isInputFocused = false
+        }
     }
     
     @ViewBuilder
@@ -205,6 +210,9 @@ struct ChatView: View {
                     shouldScrollToBottom = false
                 }
             }
+            .simultaneousGesture(
+                TapGesture().onEnded { isInputFocused = false }
+            )
         }
     }
     
@@ -238,6 +246,7 @@ struct ChatView: View {
                 .lineLimit(1...6)
                 .disabled(isStreaming)
                 .font(.body)
+                .focused($isInputFocused)
             
             if isStreaming {
                 ProgressView()
@@ -287,13 +296,18 @@ struct ChatView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if messages.isEmpty {
-                emptyStateView
-            } else {
-                messagesView
+        ZStack {
+            VStack(spacing: 0) {
+                if messages.isEmpty {
+                    emptyStateView
+                } else {
+                    messagesView
+                }
             }
-            inputBarView
+            VStack(spacing: 0) {
+                Spacer()
+                inputBarView
+            }
         }
         .navigationTitle("Chat")
         #if os(iOS)
