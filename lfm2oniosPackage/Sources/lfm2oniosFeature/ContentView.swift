@@ -461,7 +461,7 @@ struct ChatView: View {
                 if isDownloaded {
                     // Always use the current expected URL for downloaded models to avoid container UUID mismatches
                     do {
-                        urlToLoad = try storage.expectedBundleURL(for: entry)
+                        urlToLoad = try storage.expectedResourceURL(for: entry)
                         print("ui: { event: \"task:usingExpectedURL\", url: \"\(urlToLoad.path)\" }")
                     } catch {
                         print("ui: { event: \"task:expectedURLFailed\", error: \"\(String(describing: error))\" }")

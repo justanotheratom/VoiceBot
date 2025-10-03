@@ -6,6 +6,7 @@ import Foundation
 func catalogEntries() {
     #expect(!ModelCatalog.all.isEmpty)
     #expect(ModelCatalog.entry(forSlug: "lfm2-350m")?.displayName.contains("LFM2") == true)
+    #expect(ModelCatalog.entry(forSlug: "gemma3-270m")?.runtime == .mlx)
 }
 
 @Test("SelectedModel encodes and decodes via JSON")
@@ -92,12 +93,41 @@ func modelStorageService() throws {
     #expect(expectedURL.lastPathComponent.contains("test-quant"))
 }
 
+@Test("ModelStorageService resolves Gemma directories")
+func modelStorageGemma() throws {
+    let storage = ModelStorageService()
+    let metadata = ModelCatalogEntry.GemmaMetadata(
+        assetIdentifier: "gemma-test",
+        repoID: "example/repo",
+        revision: "main",
+        primaryFilePath: "model.safetensors",
+        matchingGlobs: ["model.safetensors", "tokenizer.json"]
+    )
+    let entry = ModelCatalogEntry(
+        id: "gemma-test",
+        displayName: "Gemma Test",
+        provider: "Example",
+        slug: "gemma-test",
+        quantizationSlug: nil,
+        estDownloadMB: 150,
+        contextWindow: 8192,
+        shortDescription: "Test Gemma entry",
+        downloadURLString: nil,
+        runtime: .mlx,
+        gemmaMetadata: metadata
+    )
+
+    let directoryURL = try storage.expectedResourceURL(for: entry)
+    #expect(directoryURL.lastPathComponent == metadata.assetIdentifier)
+    #expect(!storage.isDownloaded(entry: entry))
+}
+
 @Test("ModelCatalog provides consistent entries")
 func modelCatalogConsistency() {
     let entries = ModelCatalog.all
     
     // Check we have expected models
-    #expect(entries.count >= 3)
+    #expect(entries.count >= 4)
     
     // Check all entries have required fields
     for entry in entries {

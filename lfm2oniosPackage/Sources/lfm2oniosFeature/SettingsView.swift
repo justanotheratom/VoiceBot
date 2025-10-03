@@ -92,7 +92,7 @@ public struct SettingsView: View {
         await MainActor.run {
             for entry in ModelCatalog.all {
                 if storage.isDownloaded(entry: entry) {
-                    if let url = try? storage.expectedBundleURL(for: entry) {
+                    if let url = try? storage.expectedResourceURL(for: entry) {
                         downloadStates[entry.slug] = .downloaded(localURL: url)
                     }
                 } else {

@@ -81,7 +81,7 @@ Extend the existing LFM2 on-device chatbot to support downloading and running Ge
 1. **Domain & Persistence groundwork** *(completed)*
    - Add runtime/model-type metadata to `ModelCatalogEntry`, `SelectedModel`, and persistence migrations.
    - Update catalog definitions with Gemma entries and ensure UI renders provider/runtime hints.
-2. **Storage generalization**
+2. **Storage generalization** *(completed)*
    - Extend `ModelStorageService` to compute paths/checks for both bundle and directory assets; update delete/isDownloaded logic accordingly.
    - Migrate existing code paths (downloads, selection) to use the generalized helpers.
 3. **Download adapters**

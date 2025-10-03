@@ -114,7 +114,7 @@ public struct ModelSelectionView: View {
                 // If already downloaded and not currently downloading, treat row tap as selection
                 if downloading[entry.id] == nil && downloadedSet.contains(entry.id) {
                     do {
-                        let url = try storage.expectedBundleURL(for: entry)
+                        let url = try storage.expectedResourceURL(for: entry)
                         onComplete(entry, url)
                         print("ui: { event: \"select\", modelSlug: \"\(entry.slug)\" }")
                     } catch {

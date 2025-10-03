@@ -17,14 +17,16 @@ struct lfm2oniosApp: App {
             if let entry = ModelCatalog.entry(forSlug: slug) {
                 let storage = ModelStorageService()
                 do {
-                    let bundleURL = try storage.expectedBundleURL(for: entry)
+                    let bundleURL = try storage.expectedResourceURL(for: entry)
                     try FileManager.default.createDirectory(at: bundleURL, withIntermediateDirectories: true)
                     let model = SelectedModel(
                         slug: entry.slug,
                         displayName: entry.displayName,
                         provider: entry.provider,
                         quantizationSlug: entry.quantizationSlug,
-                        localURL: bundleURL
+                        localURL: bundleURL,
+                        runtime: entry.runtime,
+                        runtimeIdentifier: entry.gemmaMetadata?.assetIdentifier
                     )
                     let persistence = PersistenceService()
                     persistence.saveSelectedModel(model)
@@ -54,7 +56,7 @@ struct lfm2oniosApp: App {
                         if let entry = ModelCatalog.entry(forSlug: slug) {
                             let storage = ModelStorageService()
                             do {
-                                let bundleURL = try storage.expectedBundleURL(for: entry)
+                                let bundleURL = try storage.expectedResourceURL(for: entry)
                                 // Ensure dummy bundle folder exists so loaders pass file check
                                 try FileManager.default.createDirectory(at: bundleURL, withIntermediateDirectories: true)
                                 let model = SelectedModel(
@@ -62,7 +64,9 @@ struct lfm2oniosApp: App {
                                     displayName: entry.displayName,
                                     provider: entry.provider,
                                     quantizationSlug: entry.quantizationSlug,
-                                    localURL: bundleURL
+                                    localURL: bundleURL,
+                                    runtime: entry.runtime,
+                                    runtimeIdentifier: entry.gemmaMetadata?.assetIdentifier
                                 )
                                 let persistence = PersistenceService()
                                 persistence.saveSelectedModel(model)
