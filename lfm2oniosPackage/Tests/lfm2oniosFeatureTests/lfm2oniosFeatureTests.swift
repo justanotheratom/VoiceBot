@@ -382,6 +382,31 @@ func contextWindowManagerPreservesRecent() {
     #expect(!messagesToArchive.contains { $0.id == recentMessage.id })
 }
 
+@Test("Gemma config normalizer flattens intermediate size arrays")
+func gemmaConfigNormalizerFlattensIntermediateSize() throws {
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+
+    let configURL = tempDirectory.appendingPathComponent("config.json")
+    let payload: [String: Any] = [
+        "text_config": [
+            "intermediate_size": [8192, 8192, 8192],
+            "hidden_size": 2048
+        ]
+    ]
+    let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted])
+    try data.write(to: configURL)
+
+    GemmaConfigNormalizer.normalizeIfNeeded(in: tempDirectory)
+
+    let normalizedData = try Data(contentsOf: configURL)
+    let decoded = try JSONSerialization.jsonObject(with: normalizedData) as? [String: Any]
+    let textConfig = decoded?["text_config"] as? [String: Any]
+    let intermediateSize = textConfig?["intermediate_size"] as? Int
+
+    #expect(intermediateSize == 8192)
+}
+
 @Test("TitleGenerationService fallback title generation")
 @MainActor
 func titleGenerationFallback() async {

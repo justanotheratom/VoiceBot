@@ -202,6 +202,8 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
             throw ModelDownloadError.underlying("Gemma primary file missing after download")
         }
 
+        GemmaConfigNormalizer.normalizeIfNeeded(in: destinationDirectory)
+
         progress(1.0)
         return destinationDirectory
     }
