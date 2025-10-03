@@ -156,18 +156,26 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
             let message = error.localizedDescription
             AppLogger.download().log(event: "gemma:snapshotFailed", data: [
                 "error": message
-            ], level: .error)
+            ])
 
             if message.contains("Offline mode error") || message.contains("Repository not available locally") {
-                AppLogger.download().log(event: "gemma:directFallback", data: [
+                AppLogger.download().log(event: "gemma:directFallback:start", data: [
                     "repo": metadata.repoID
                 ])
-                snapshotURL = try await downloadGemmaFilesDirectly(
-                    metadata: metadata,
-                    destinationDirectory: destinationDirectory,
-                    progress: progress
-                )
-                usedSnapshotArchive = false
+                do {
+                    snapshotURL = try await downloadGemmaFilesDirectly(
+                        metadata: metadata,
+                        destinationDirectory: destinationDirectory,
+                        progress: progress
+                    )
+                    usedSnapshotArchive = false
+                } catch {
+                    AppLogger.download().log(event: "gemma:directFallbackFailed", data: [
+                        "repo": metadata.repoID,
+                        "error": error.localizedDescription
+                    ], level: .error)
+                    throw error
+                }
             } else {
                 throw ModelDownloadError.underlying("Hub snapshot failed: \(message)")
             }
@@ -272,7 +280,7 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
         let totalFiles = Double(files.count)
         var processedFiles = 0.0
 
-        for file in files {
+        for (index, file) in files.enumerated() {
             try Task.checkCancellation()
 
             let encodedPath = file.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? file
@@ -285,7 +293,9 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
 
             let start = DispatchTime.now()
             AppLogger.download().log(event: "gemma:directFileStart", data: [
-                "file": file
+                "file": file,
+                "index": index + 1,
+                "total": files.count
             ])
 
             let (tempURL, response) = try await URLSession.shared.download(for: request)
@@ -305,7 +315,9 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
             let expectedBytes = response.expectedContentLength >= 0 ? response.expectedContentLength : nil
             var logData: [String: Any] = [
                 "file": file,
-                "elapsedMs": Int(elapsedMs.rounded())
+                "elapsedMs": Int(elapsedMs.rounded()),
+                "index": index + 1,
+                "total": files.count
             ]
             if let bytes = expectedBytes {
                 logData["expectedBytes"] = bytes
