@@ -47,7 +47,9 @@ public struct ContentView: View {
                             displayName: entry.displayName,
                             provider: entry.provider,
                             quantizationSlug: entry.quantizationSlug,
-                            localURL: localURL
+                            localURL: localURL,
+                            runtime: entry.runtime,
+                            runtimeIdentifier: entry.gemmaMetadata?.assetIdentifier
                         )
                         persistence.saveSelectedModel(model)
                         selected = model
@@ -403,7 +405,9 @@ struct ChatView: View {
                             displayName: entry.displayName,
                             provider: entry.provider,
                             quantizationSlug: entry.quantizationSlug,
-                            localURL: url
+                            localURL: url,
+                            runtime: entry.runtime,
+                            runtimeIdentifier: entry.gemmaMetadata?.assetIdentifier
                         )
                         persistence.saveSelectedModel(model)
                         onSelectModel(model)

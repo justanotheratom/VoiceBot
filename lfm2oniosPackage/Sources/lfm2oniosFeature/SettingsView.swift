@@ -383,7 +383,8 @@ enum DownloadState: Equatable {
                 displayName: "LFM2 350M",
                 provider: "LiquidAI",
                 quantizationSlug: "lfm2-350m-20250710-8da4w",
-                localURL: URL(string: "file:///some/path")
+                localURL: URL(string: "file:///some/path"),
+                runtime: .leap
             ),
             onSelectModel: { _, _ in },
             onDeleteModel: { _ in },

@@ -78,7 +78,7 @@ Extend the existing LFM2 on-device chatbot to support downloading and running Ge
 - **Token management:** Hugging Face rate limits require configurable tokens; provide Info.plist overrides but avoid shipping secrets.
 
 ## Implementation Checklist
-1. **Domain & Persistence groundwork**
+1. **Domain & Persistence groundwork** *(completed)*
    - Add runtime/model-type metadata to `ModelCatalogEntry`, `SelectedModel`, and persistence migrations.
    - Update catalog definitions with Gemma entries and ensure UI renders provider/runtime hints.
 2. **Storage generalization**

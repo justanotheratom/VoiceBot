@@ -1,6 +1,33 @@
 import Foundation
 
+public enum ModelRuntimeKind: String, Codable, Sendable {
+    case leap
+    case mlx
+}
+
 public struct ModelCatalogEntry: Identifiable, Codable, Equatable, Sendable {
+    public struct GemmaMetadata: Codable, Equatable, Sendable {
+        public let assetIdentifier: String
+        public let repoID: String
+        public let revision: String
+        public let primaryFilePath: String
+        public let matchingGlobs: [String]
+
+        public init(
+            assetIdentifier: String,
+            repoID: String,
+            revision: String,
+            primaryFilePath: String,
+            matchingGlobs: [String]
+        ) {
+            self.assetIdentifier = assetIdentifier
+            self.repoID = repoID
+            self.revision = revision
+            self.primaryFilePath = primaryFilePath
+            self.matchingGlobs = matchingGlobs
+        }
+    }
+
     public let id: String            // Use slug as stable identifier
     public let displayName: String
     public let provider: String
@@ -10,6 +37,8 @@ public struct ModelCatalogEntry: Identifiable, Codable, Equatable, Sendable {
     public let contextWindow: Int
     public let shortDescription: String
     public let downloadURLString: String?
+    public let runtime: ModelRuntimeKind
+    public let gemmaMetadata: GemmaMetadata?
 
     public init(
         id: String,
@@ -20,7 +49,9 @@ public struct ModelCatalogEntry: Identifiable, Codable, Equatable, Sendable {
         estDownloadMB: Int,
         contextWindow: Int,
         shortDescription: String,
-        downloadURLString: String?
+        downloadURLString: String?,
+        runtime: ModelRuntimeKind,
+        gemmaMetadata: GemmaMetadata? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -31,6 +62,8 @@ public struct ModelCatalogEntry: Identifiable, Codable, Equatable, Sendable {
         self.contextWindow = contextWindow
         self.shortDescription = shortDescription
         self.downloadURLString = downloadURLString
+        self.runtime = runtime
+        self.gemmaMetadata = gemmaMetadata
     }
 }
 
@@ -46,7 +79,8 @@ public enum ModelCatalog {
             estDownloadMB: 322,
             contextWindow: 4096,
             shortDescription: "Smallest LFM2 text model; fastest on-device option",
-            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2-350M-8da4w_output_8da8w-seq_4096.bundle?download=true"
+            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2-350M-8da4w_output_8da8w-seq_4096.bundle?download=true",
+            runtime: .leap
         ),
         ModelCatalogEntry(
             id: "lfm2-700m",
@@ -57,7 +91,8 @@ public enum ModelCatalog {
             estDownloadMB: 610,
             contextWindow: 4096,
             shortDescription: "Balanced quality vs size; still mobile-friendly",
-            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2-700M-8da4w_output_8da8w-seq_4096.bundle?download=true"
+            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2-700M-8da4w_output_8da8w-seq_4096.bundle?download=true",
+            runtime: .leap
         ),
         ModelCatalogEntry(
             id: "lfm2-1.2b",
@@ -68,7 +103,30 @@ public enum ModelCatalog {
             estDownloadMB: 924,
             contextWindow: 4096,
             shortDescription: "Higher quality; larger footprint on mobile",
-            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2-1.2B-8da4w_output_8da8w-seq_4096.bundle?download=true"
+            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2-1.2B-8da4w_output_8da8w-seq_4096.bundle?download=true",
+            runtime: .leap
+        ),
+        ModelCatalogEntry(
+            id: "gemma3-270m",
+            displayName: "Gemma 3 270M IT",
+            provider: "Google",
+            slug: "gemma3-270m",
+            quantizationSlug: nil,
+            estDownloadMB: 145,
+            contextWindow: 8192,
+            shortDescription: "Instruction-tuned Gemma 3 running via MLX runtime",
+            downloadURLString: nil,
+            runtime: .mlx,
+            gemmaMetadata: .init(
+                assetIdentifier: "gemma3-270m-4bit",
+                repoID: "mlx-community/gemma-3-270m-it-4bit",
+                revision: "main",
+                primaryFilePath: "model.safetensors",
+                matchingGlobs: [
+                    "model.safetensors",
+                    "tokenizer.json"
+                ]
+            )
         )
     ]
 
@@ -76,5 +134,4 @@ public enum ModelCatalog {
         return all.first { $0.slug == slug || $0.id == slug }
     }
 }
-
 

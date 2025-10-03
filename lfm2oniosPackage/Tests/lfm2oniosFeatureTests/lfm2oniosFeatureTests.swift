@@ -10,7 +10,7 @@ func catalogEntries() {
 
 @Test("SelectedModel encodes and decodes via JSON")
 func selectedModelCodable() throws {
-    let original = SelectedModel(slug: "slug", displayName: "Name", provider: "Leap", quantizationSlug: nil, localURL: nil)
+    let original = SelectedModel(slug: "slug", displayName: "Name", provider: "Leap", quantizationSlug: nil, localURL: nil, runtime: .leap)
     let data = try JSONEncoder().encode(original)
     let decoded = try JSONDecoder().decode(SelectedModel.self, from: data)
     #expect(decoded == original)
@@ -54,7 +54,8 @@ func persistenceService() throws {
         displayName: "Test Model",
         provider: "Test Provider",
         quantizationSlug: "test-quant",
-        localURL: URL(string: "file:///test/path")
+        localURL: URL(string: "file:///test/path"),
+        runtime: .leap
     )
     
     service.saveSelectedModel(model)
@@ -78,7 +79,8 @@ func modelStorageService() throws {
         estDownloadMB: 100,
         contextWindow: 2048,
         shortDescription: "A test model",
-        downloadURLString: "https://example.com/model.zip"
+        downloadURLString: "https://example.com/model.zip",
+        runtime: .leap
     )
     
     // Should not be downloaded initially

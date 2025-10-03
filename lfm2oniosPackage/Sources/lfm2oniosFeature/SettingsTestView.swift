@@ -20,7 +20,9 @@ public struct SettingsTestView: View {
             displayName: entry.displayName,
             provider: entry.provider,
             quantizationSlug: entry.quantizationSlug,
-            localURL: URL(string: "file://test")
+            localURL: URL(string: "file://test"),
+            runtime: entry.runtime,
+            runtimeIdentifier: entry.gemmaMetadata?.assetIdentifier
         )
     }
     
