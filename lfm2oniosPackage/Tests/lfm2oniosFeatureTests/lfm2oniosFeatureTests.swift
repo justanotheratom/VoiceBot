@@ -7,6 +7,7 @@ func catalogEntries() {
     #expect(!ModelCatalog.all.isEmpty)
     #expect(ModelCatalog.entry(forSlug: "lfm2-350m")?.displayName.contains("LFM2") == true)
     #expect(ModelCatalog.entry(forSlug: "gemma3-270m")?.runtime == .mlx)
+    #expect(ModelCatalog.entry(forSlug: "gemma3n-e2b")?.runtime == .mlx)
 }
 
 @Test("SelectedModel encodes and decodes via JSON")
@@ -127,7 +128,7 @@ func modelCatalogConsistency() {
     let entries = ModelCatalog.all
     
     // Check we have expected models
-    #expect(entries.count >= 4)
+    #expect(entries.count >= 5)
     
     // Check all entries have required fields
     for entry in entries {
@@ -317,6 +318,7 @@ func contextWindowManagerLimits() {
     #expect(manager.getContextLimit(for: "lfm2-700m") == ModelCatalog.entry(forSlug: "lfm2-700m")?.contextWindow)
     #expect(manager.getContextLimit(for: "lfm2-1.2b") == ModelCatalog.entry(forSlug: "lfm2-1.2b")?.contextWindow)
     #expect(manager.getContextLimit(for: "gemma3-270m") == ModelCatalog.entry(forSlug: "gemma3-270m")?.contextWindow)
+    #expect(manager.getContextLimit(for: "gemma3n-e2b") == ModelCatalog.entry(forSlug: "gemma3n-e2b")?.contextWindow)
     
     let baseLimit = manager.getContextLimit(for: "lfm2-350m")
     let responseBudget = manager.responseTokenBudget(for: "lfm2-350m")
@@ -324,6 +326,9 @@ func contextWindowManagerLimits() {
 
     let gemmaBudget = manager.responseTokenBudget(for: "gemma3-270m")
     #expect(gemmaBudget == 512)
+
+    let gemmaE2BBudget = manager.responseTokenBudget(for: "gemma3n-e2b")
+    #expect(gemmaE2BBudget == 512)
     
     // Test unknown model defaults to 4096
     #expect(manager.getContextLimit(for: "unknown-model") == 4096)

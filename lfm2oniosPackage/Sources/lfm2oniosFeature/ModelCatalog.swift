@@ -149,6 +149,38 @@ public enum ModelCatalog {
             systemPrompt: "You are Gemma, an on-device assistant. Answer user questions directly with a short, factual reply. Do not repeat phrases or re-state that you are answering; simply provide the response and stop."
         ),
         ModelCatalogEntry(
+            id: "gemma3n-e2b",
+            displayName: "Gemma 3n E2B IT",
+            provider: "Google",
+            slug: "gemma3n-e2b",
+            quantizationSlug: nil,
+            estDownloadMB: 1_596,
+            contextWindow: 32_768,
+            shortDescription: "Multimodal-capable Gemma 3n E2B running via MLX runtime",
+            downloadURLString: nil,
+            runtime: .mlx,
+            gemmaMetadata: .init(
+                assetIdentifier: "gemma3n-e2b-4bit",
+                repoID: "mlx-community/gemma-3n-E2B-it-4bit",
+                revision: "main",
+                primaryFilePath: "model.safetensors",
+                matchingGlobs: [
+                    "model.safetensors",
+                    "model.safetensors.index.json",
+                    "tokenizer.json",
+                    "tokenizer.model",
+                    "tokenizer_config.json",
+                    "config.json",
+                    "generation_config.json",
+                    "special_tokens_map.json",
+                    "preprocessor_config.json",
+                    "processor_config.json",
+                    "chat_template.jinja"
+                ]
+            ),
+            systemPrompt: "You are Gemma, an on-device assistant. Answer user questions directly with a short, factual reply. Do not repeat phrases or re-state that you are answering; simply provide the response and stop."
+        ),
+        ModelCatalogEntry(
             id: "gemma3-270m",
             displayName: "Gemma 3 270M IT",
             provider: "Google",
