@@ -1,6 +1,7 @@
 import Foundation
 import LeapSDK
 @preconcurrency import LeapModelDownloader
+@preconcurrency import Hub
 
 protocol RuntimeModelDownloadAdapting: Sendable {
     func download(
@@ -114,12 +115,98 @@ struct LeapModelDownloadAdapter: RuntimeModelDownloadAdapting {
 }
 
 struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
+    private let hub: HubApi
+
+    init(hub: HubApi = GemmaHubClient.shared) {
+        self.hub = hub
+    }
+
     func download(
         entry: ModelCatalogEntry,
         progress: @Sendable @escaping (Double) -> Void
     ) async throws -> URL {
-        // TODO: Implement MLX/Hub-backed download flow for Gemma assets.
-        print("download: { event: \"gemma:adapterMissing\", slug: \"\(entry.slug)\" }")
-        throw ModelDownloadError.downloaderUnavailable
+        guard let metadata = entry.gemmaMetadata else {
+            throw ModelDownloadError.missingMetadata
+        }
+
+        print("download: { event: \"gemma:start\", slug: \"\(entry.slug)\", repoID: \"\(metadata.repoID)\", revision: \"\(metadata.revision)\" }")
+
+        let storage = ModelStorageService()
+        let destinationDirectory = try storage.expectedGemmaDirectoryURL(for: entry)
+
+        let fileManager = FileManager.default
+
+        // Ensure parent directory exists and remove stale payloads
+        let parent = destinationDirectory.deletingLastPathComponent()
+        try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
+        if fileManager.fileExists(atPath: destinationDirectory.path) {
+            try fileManager.removeItem(at: destinationDirectory)
+        }
+
+        progress(0)
+
+        let repo = Hub.Repo(id: metadata.repoID)
+
+        let snapshotURL = try await hub.snapshot(
+            from: repo,
+            revision: metadata.revision,
+            matching: metadata.matchingGlobs
+        ) { hubProgress in
+            let total = hubProgress.totalUnitCount
+            let completed = hubProgress.completedUnitCount
+            if total > 0 {
+                let fraction = min(max(Double(completed) / Double(total), 0), 1)
+                progress(fraction)
+            }
+        }
+
+        defer {
+            try? fileManager.removeItem(at: snapshotURL)
+        }
+
+        try Task.checkCancellation()
+
+        try promoteSnapshot(from: snapshotURL, to: destinationDirectory)
+
+        let primaryFile = destinationDirectory.appendingPathComponent(metadata.primaryFilePath)
+        if !fileManager.fileExists(atPath: primaryFile.path) {
+            print("download: { event: \"gemma:primaryMissing\", slug: \"\(entry.slug)\", expected: \"\(primaryFile.path)\" }")
+            throw ModelDownloadError.underlying("Gemma primary file missing after download")
+        }
+
+        progress(1.0)
+        print("download: { event: \"gemma:complete\", slug: \"\(entry.slug)\", path: \"\(destinationDirectory.path)\" }")
+        return destinationDirectory
+    }
+
+    private func promoteSnapshot(from snapshot: URL, to destination: URL) throws {
+        let fileManager = FileManager.default
+        let enumerator = fileManager.enumerator(
+            at: snapshot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )
+
+        try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
+
+        while let item = enumerator?.nextObject() as? URL {
+            let relativePath = item.path.replacingOccurrences(of: snapshot.path, with: "")
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+            guard !relativePath.isEmpty else { continue }
+
+            let target = destination.appendingPathComponent(relativePath, isDirectory: item.hasDirectoryPath)
+
+            if item.hasDirectoryPath {
+                try fileManager.createDirectory(at: target, withIntermediateDirectories: true)
+            } else {
+                let parent = target.deletingLastPathComponent()
+                try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
+                if fileManager.fileExists(atPath: target.path) {
+                    try fileManager.removeItem(at: target)
+                }
+                try fileManager.copyItem(at: item, to: target)
+            }
+        }
     }
 }
