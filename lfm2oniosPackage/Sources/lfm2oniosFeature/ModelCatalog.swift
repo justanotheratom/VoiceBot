@@ -119,6 +119,36 @@ public enum ModelCatalog {
             runtime: .leap
         ),
         ModelCatalogEntry(
+            id: "gemma3-1b",
+            displayName: "Gemma 3 1B IT",
+            provider: "Google",
+            slug: "gemma3-1b",
+            quantizationSlug: nil,
+            estDownloadMB: 530,
+            contextWindow: 8192,
+            shortDescription: "Larger Gemma 3 instruction-tuned model via MLX runtime",
+            downloadURLString: nil,
+            runtime: .mlx,
+            gemmaMetadata: .init(
+                assetIdentifier: "gemma3-1b-4bit",
+                repoID: "mlx-community/gemma-3-1b-it-4bit",
+                revision: "main",
+                primaryFilePath: "model.safetensors",
+                matchingGlobs: [
+                    "model.safetensors",
+                    "model.safetensors.index.json",
+                    "tokenizer.json",
+                    "tokenizer.model",
+                    "tokenizer_config.json",
+                    "config.json",
+                    "special_tokens_map.json",
+                    "added_tokens.json",
+                    "preprocessor_config.json"
+                ]
+            ),
+            systemPrompt: "You are Gemma, an on-device assistant. Answer user questions directly with a short, factual reply. Do not repeat phrases or re-state that you are answering; simply provide the response and stop."
+        ),
+        ModelCatalogEntry(
             id: "gemma3-270m",
             displayName: "Gemma 3 270M IT",
             provider: "Google",
