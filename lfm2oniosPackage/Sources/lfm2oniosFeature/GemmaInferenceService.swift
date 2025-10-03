@@ -28,6 +28,12 @@ actor GemmaInferenceService {
         self.modelDirectory = modelDirectory
     }
 
+    func preloadModel() async throws {
+        print("runtime: { event: \"gemma:preload:start\" }")
+        _ = try await loadContainer()
+        print("runtime: { event: \"gemma:preload:ready\" }")
+    }
+
     func tokenStream(
         conversation: [ChatMessageModel],
         maxTokens: Int? = nil,

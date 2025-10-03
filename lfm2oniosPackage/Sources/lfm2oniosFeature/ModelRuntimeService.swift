@@ -37,6 +37,15 @@ public actor ModelRuntimeService {
         try await adapter!.loadModel(at: url, entry: entry)
         loadedURL = url
         currentEntryID = entry.id
+
+        print("runtime: { event: \"preload:start\", slug: \"\(entry.slug)\" }")
+        do {
+            try await adapter!.preload()
+            print("runtime: { event: \"preload:complete\", slug: \"\(entry.slug)\" }")
+        } catch {
+            print("runtime: { event: \"preload:failed\", slug: \"\(entry.slug)\", error: \"\(error.localizedDescription)\" }")
+            throw error
+        }
     }
 
     public func unloadModel() async {

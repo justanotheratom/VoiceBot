@@ -109,6 +109,15 @@ final actor GemmaRuntimeAdapter: ModelRuntimeAdapting {
         }
     }
 
+    func preload() async throws {
+        let maybeService = inferenceService as GemmaInferenceService?
+        guard let service = maybeService else {
+            throw ModelRuntimeError.notLoaded
+        }
+
+        try await service.preloadModel()
+    }
+
     private func makeGenerationParameters(limit: Int) -> GenerateParameters {
         let cappedLimit = min(max(limit, 1), gemmaMaxResponseTokens)
         return GenerateParameters(

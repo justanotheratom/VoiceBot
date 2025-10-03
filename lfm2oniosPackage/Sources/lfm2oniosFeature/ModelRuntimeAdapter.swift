@@ -10,6 +10,11 @@ protocol ModelRuntimeAdapting: Sendable {
         tokenLimit: Int,
         onToken: @Sendable @escaping (String) async -> Void
     ) async throws
+    func preload() async throws
+}
+
+extension ModelRuntimeAdapting {
+    func preload() async throws {}
 }
 
 enum ModelRuntimeAdapterFactory {
