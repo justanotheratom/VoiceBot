@@ -135,6 +135,7 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
         }
 
         let snapshotURL: URL
+        var usedSnapshotArchive = true
         do {
             snapshotURL = try await hub.snapshot(
                 from: repo,
@@ -149,22 +150,38 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
                 }
             }
         } catch {
-            print("download: { event: \"gemma:snapshotFailed\", error: \"\(error.localizedDescription)\" }")
-            throw ModelDownloadError.underlying("Hub snapshot failed: \(error.localizedDescription)")
+            let message = error.localizedDescription
+            print("download: { event: \"gemma:snapshotFailed\", error: \"\(message)\" }")
+
+            if message.contains("Offline mode error") || message.contains("Repository not available locally") {
+                print("download: { event: \"gemma:directFallback\", repo: \"\(metadata.repoID)\" }")
+                snapshotURL = try await downloadGemmaFilesDirectly(
+                    metadata: metadata,
+                    destinationDirectory: destinationDirectory,
+                    progress: progress
+                )
+                usedSnapshotArchive = false
+            } else {
+                throw ModelDownloadError.underlying("Hub snapshot failed: \(message)")
+            }
         }
 
         defer {
-            try? fileManager.removeItem(at: snapshotURL)
+            if usedSnapshotArchive {
+                try? fileManager.removeItem(at: snapshotURL)
+            }
         }
 
         try Task.checkCancellation()
 
-        do {
-            try promoteSnapshot(from: snapshotURL, to: destinationDirectory)
-            try flattenPrivateDirectoryIfNeeded(at: destinationDirectory)
-        } catch {
-            print("download: { event: \"gemma:promoteFailed\", error: \"\(error.localizedDescription)\" }")
-            throw ModelDownloadError.underlying("Failed to prepare Gemma assets: \(error.localizedDescription)")
+        if usedSnapshotArchive {
+            do {
+                try promoteSnapshot(from: snapshotURL, to: destinationDirectory)
+                try flattenPrivateDirectoryIfNeeded(at: destinationDirectory)
+            } catch {
+                print("download: { event: \"gemma:promoteFailed\", error: \"\(error.localizedDescription)\" }")
+                throw ModelDownloadError.underlying("Failed to prepare Gemma assets: \(error.localizedDescription)")
+            }
         }
 
         let primaryFile = destinationDirectory.appendingPathComponent(metadata.primaryFilePath)
@@ -223,5 +240,52 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
             try fileManager.moveItem(at: item, to: target)
         }
         try fileManager.removeItem(at: privateDir)
+    }
+
+    private func downloadGemmaFilesDirectly(
+        metadata: ModelCatalogEntry.GemmaMetadata,
+        destinationDirectory: URL,
+        progress: @Sendable @escaping (Double) -> Void
+    ) async throws -> URL {
+        guard let token = GemmaHubTokenProvider.huggingFaceToken() else {
+            throw ModelDownloadError.missingToken
+        }
+
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
+
+        let files = metadata.matchingGlobs
+        let totalFiles = Double(files.count)
+        var processedFiles = 0.0
+
+        for file in files {
+            try Task.checkCancellation()
+
+            let encodedPath = file.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? file
+            guard let url = URL(string: "https://huggingface.co/\(metadata.repoID)/resolve/\(metadata.revision)/\(encodedPath)") else {
+                throw ModelDownloadError.underlying("Invalid URL constructed for file \(file)")
+            }
+
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+            let (tempURL, response) = try await URLSession.shared.download(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                throw ModelDownloadError.underlying("Failed to download \(file) (status \(status))")
+            }
+
+            let targetURL = destinationDirectory.appendingPathComponent(file)
+            try fileManager.createDirectory(at: targetURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if fileManager.fileExists(atPath: targetURL.path) {
+                try fileManager.removeItem(at: targetURL)
+            }
+            try fileManager.moveItem(at: tempURL, to: targetURL)
+
+            processedFiles += 1
+            progress(min(processedFiles / totalFiles, 1.0))
+        }
+
+        return destinationDirectory
     }
 }
