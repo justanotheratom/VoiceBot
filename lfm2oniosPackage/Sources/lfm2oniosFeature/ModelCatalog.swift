@@ -165,17 +165,17 @@ public enum ModelCatalog {
                 revision: "main",
                 primaryFilePath: "model.safetensors",
                 matchingGlobs: [
-                    "model.safetensors",
-                    "model.safetensors.index.json",
-                    "tokenizer.json",
-                    "tokenizer.model",
-                    "tokenizer_config.json",
                     "config.json",
                     "generation_config.json",
+                    "tokenizer.json",
+                    "tokenizer_config.json",
                     "special_tokens_map.json",
                     "preprocessor_config.json",
                     "processor_config.json",
-                    "chat_template.jinja"
+                    "chat_template.jinja",
+                    "tokenizer.model",
+                    "model.safetensors.index.json",
+                    "model.safetensors"
                 ]
             ),
             systemPrompt: "You are Gemma, an on-device assistant. Answer user questions directly with a short, factual reply. Do not repeat phrases or re-state that you are answering; simply provide the response and stop."

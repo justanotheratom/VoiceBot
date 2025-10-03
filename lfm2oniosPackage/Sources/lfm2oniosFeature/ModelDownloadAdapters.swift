@@ -283,6 +283,11 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
             var request = URLRequest(url: url)
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
+            let start = DispatchTime.now()
+            AppLogger.download().log(event: "gemma:directFileStart", data: [
+                "file": file
+            ])
+
             let (tempURL, response) = try await URLSession.shared.download(for: request)
             guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? -1
@@ -295,6 +300,17 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
                 try fileManager.removeItem(at: targetURL)
             }
             try fileManager.moveItem(at: tempURL, to: targetURL)
+
+            let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
+            let expectedBytes = response.expectedContentLength >= 0 ? response.expectedContentLength : nil
+            var logData: [String: Any] = [
+                "file": file,
+                "elapsedMs": Int(elapsedMs.rounded())
+            ]
+            if let bytes = expectedBytes {
+                logData["expectedBytes"] = bytes
+            }
+            AppLogger.download().log(event: "gemma:directFileComplete", data: logData)
 
             processedFiles += 1
             progress(min(processedFiles / totalFiles, 1.0))
