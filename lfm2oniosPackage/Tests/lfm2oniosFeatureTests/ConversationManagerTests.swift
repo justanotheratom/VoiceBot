@@ -28,9 +28,18 @@ func conversationManagerAddUserMessage() {
     manager.addUserMessage("Hello, how are you?")
     
     let messages = manager.getMessagesForLLM()
-    #expect(messages.count == 2) // Initial empty message + user message
-    #expect(messages.last?.role == .user)
-    #expect(messages.last?.content == "Hello, how are you?")
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    if let systemPrompt {
+        #expect(messages.count == 2)
+        #expect(messages.first?.role == .system)
+        #expect(messages.first?.content == systemPrompt)
+        #expect(messages.last?.role == .user)
+        #expect(messages.last?.content == "Hello, how are you?")
+    } else {
+        #expect(messages.count == 1)
+        #expect(messages.first?.role == .user)
+        #expect(messages.first?.content == "Hello, how are you?")
+    }
 }
 
 @Test("ConversationManager adds assistant messages and triggers title generation")
@@ -47,7 +56,9 @@ func conversationManagerAddAssistantMessage() async {
     await manager.addAssistantMessage("I'm doing well, thank you!")
     
     let messages = manager.getMessagesForLLM()
-    #expect(messages.count == 3) // Initial empty + user + assistant
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    let expectedCount = (systemPrompt == nil ? 0 : 1) + 2 // system? + user + assistant
+    #expect(messages.count == expectedCount)
     #expect(messages.last?.role == .assistant)
     #expect(messages.last?.content == "I'm doing well, thank you!")
     

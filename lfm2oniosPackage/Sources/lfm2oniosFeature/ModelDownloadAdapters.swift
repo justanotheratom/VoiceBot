@@ -97,10 +97,10 @@ struct LeapModelDownloadAdapter: RuntimeModelDownloadAdapting {
 }
 
 struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
-    private let hub: HubApi
+    private let hubProvider: @Sendable () throws -> HubApi
 
-    init(hub: HubApi = GemmaHubClient.shared) {
-        self.hub = hub
+    init(hubProvider: @escaping @Sendable () throws -> HubApi = { try GemmaHubClient.shared() }) {
+        self.hubProvider = hubProvider
     }
 
     func download(
@@ -126,6 +126,13 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
         progress(0)
 
         let repo = Hub.Repo(id: metadata.repoID)
+        let hub: HubApi
+        do {
+            hub = try hubProvider()
+        } catch is GemmaHubClient.Error {
+            print("download: { event: \"gemma:missingToken\" }")
+            throw ModelDownloadError.missingToken
+        }
 
         let snapshotURL: URL
         do {

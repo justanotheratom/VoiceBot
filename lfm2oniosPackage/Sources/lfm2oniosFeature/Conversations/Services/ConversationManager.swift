@@ -8,6 +8,7 @@ class ConversationManager {
     private let contextManager = ContextWindowManager()
     private let titleService: TitleGenerationService
     private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "conversation")
+    private var activeModelSlug: String?
     
     var currentConversation: ChatConversation?
     var needsTitleGeneration = false
@@ -17,25 +18,34 @@ class ConversationManager {
     }
     
     func startNewConversation(modelSlug: String) {
-        let userMessage = ChatMessageModel(role: .user, content: "")
-        currentConversation = ChatConversation(modelSlug: modelSlug, initialMessage: userMessage)
+        activeModelSlug = modelSlug
+        var conversation = ChatConversation(modelSlug: modelSlug, initialMessages: [])
+        ensureSystemMessage(in: &conversation, persist: false)
+        currentConversation = conversation
         needsTitleGeneration = false
         logger.info("conversation: { event: \"new\", modelSlug: \"\(modelSlug)\" }")
+        saveCurrentConversation()
     }
     
     func loadConversation(_ conversation: ChatConversation) {
-        currentConversation = conversation
+        var mutableConversation = conversation
+        activeModelSlug = conversation.modelSlug
+        ensureSystemMessage(in: &mutableConversation, persist: true)
+        currentConversation = mutableConversation
         needsTitleGeneration = false
-        logger.info("conversation: { event: \"loaded\", id: \"\(conversation.id)\", messageCount: \(conversation.messages.count) }")
+        logger.info("conversation: { event: \"loaded\", id: \"\(mutableConversation.id)\", messageCount: \(mutableConversation.messages.count) }")
     }
     
     func addUserMessage(_ content: String) {
-        guard var conversation = currentConversation else { 
-            // If no current conversation, create a new one with this message
-            let userMessage = ChatMessageModel(role: .user, content: content)
-            currentConversation = ChatConversation(modelSlug: "unknown", initialMessage: userMessage)
-            saveCurrentConversation()
-            return
+        var conversation: ChatConversation
+        if var existing = currentConversation {
+            ensureSystemMessage(in: &existing, persist: true)
+            conversation = existing
+        } else {
+            let slug = activeModelSlug ?? "unknown"
+            conversation = ChatConversation(modelSlug: slug, initialMessages: [])
+            ensureSystemMessage(in: &conversation, persist: false)
+            activeModelSlug = slug
         }
         
         let message = ChatMessageModel(role: .user, content: content)
@@ -44,22 +54,25 @@ class ConversationManager {
         // Check if we need to archive messages using context manager
         if contextManager.shouldArchiveMessages(in: conversation) {
             let messagesToArchive = contextManager.getMessagesToArchive(from: conversation)
-            conversation.archiveOldMessages(messagesToArchive.map { ChatMessageModel(role: $0.role, content: $0.content) })
+            conversation.archiveOldMessages(messagesToArchive)
         }
-        
+
         currentConversation = conversation
         saveCurrentConversation()
     }
     
     func addAssistantMessage(_ content: String) async {
         guard var conversation = currentConversation else { return }
+        ensureSystemMessage(in: &conversation, persist: true)
         
+        let shouldTriggerTitle = !needsTitleGeneration && !conversation.messages.contains { $0.role == .assistant }
+
         let message = ChatMessageModel(role: .assistant, content: content)
         conversation.addMessage(message)
         currentConversation = conversation
-        
-        // Generate title after first assistant response
-        if conversation.messages.count == 2 && !needsTitleGeneration {
+        activeModelSlug = conversation.modelSlug
+
+        if shouldTriggerTitle {
             needsTitleGeneration = true
             await generateTitleIfNeeded()
         }
@@ -68,8 +81,9 @@ class ConversationManager {
     }
     
     func getMessagesForLLM() -> [ChatMessageModel] {
-        // Return only active messages (not archived) for LLM context
-        return currentConversation?.messages ?? []
+        guard var conversation = currentConversation else { return [] }
+        ensureSystemMessage(in: &conversation, persist: true)
+        return conversation.messages
     }
     
     func getAllMessagesForDisplay() -> [ChatMessageModel] {
@@ -86,7 +100,24 @@ class ConversationManager {
             logger.error("conversation: { event: \"saveFailed\", error: \"\(error.localizedDescription)\" }")
         }
     }
-    
+
+    private func ensureSystemMessage(in conversation: inout ChatConversation, persist: Bool) {
+        let slug = conversation.modelSlug
+        guard let prompt = ModelCatalog.entry(forSlug: slug)?.systemPrompt?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !prompt.isEmpty else {
+            return
+        }
+
+        if conversation.messages.first(where: { $0.role == .system }) == nil {
+            let systemMessage = ChatMessageModel(role: .system, content: prompt)
+            conversation.messages.insert(systemMessage, at: 0)
+            if persist {
+                currentConversation = conversation
+                saveCurrentConversation()
+            }
+        }
+    }
+
     private func generateTitleIfNeeded() async {
         guard var conversation = currentConversation,
               conversation.title == "New Conversation" else { return }

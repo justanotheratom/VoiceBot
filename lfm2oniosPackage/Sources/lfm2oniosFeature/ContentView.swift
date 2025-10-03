@@ -99,6 +99,7 @@ struct ChatView: View {
     @State private var input: String = ""
     @FocusState private var isInputFocused: Bool
     @State private var isStreaming: Bool = false
+    @State private var userRequestedStop: Bool = false
     @State private var didAutoSend: Bool = false
     @State private var showSettings = false
     @State private var streamingTask: Task<Void, Never>?
@@ -106,6 +107,7 @@ struct ChatView: View {
     @State private var scrollTimer: Timer?
     @State private var showingConversationHistory = false
     private let storage = ModelStorageService()
+    private let contextManager = ContextWindowManager()
     
     private var canSend: Bool {
         !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isStreaming
@@ -267,21 +269,37 @@ struct ChatView: View {
     
     @ViewBuilder
     private var sendButtonView: some View {
-        Button(action: { send() }) {
-            Image(systemName: canSend ? "arrow.up.circle.fill" : "circle.fill")
-                .font(.system(size: 36))
-                .foregroundStyle(canSend ? .blue : .secondary)
-                .symbolEffect(.bounce, value: input)
-                .background {
-                    Circle()
-                        .fill(.background)
-                        .stroke(.separator.opacity(0.2), lineWidth: canSend ? 0 : 1)
-                }
+        if isStreaming {
+            Button(action: { stopStreaming(userInitiated: true) }) {
+                Image(systemName: "stop.circle.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(.red)
+                    .background {
+                        Circle()
+                            .fill(.background)
+                            .stroke(.separator.opacity(0.2), lineWidth: 0)
+                    }
+            }
+            .accessibilityLabel("Stop response")
+            .accessibilityIdentifier("stopButton")
+            .animation(.easeInOut(duration: 0.2), value: isStreaming)
+        } else {
+            Button(action: { send() }) {
+                Image(systemName: canSend ? "arrow.up.circle.fill" : "circle.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(canSend ? .blue : .secondary)
+                    .symbolEffect(.bounce, value: input)
+                    .background {
+                        Circle()
+                            .fill(.background)
+                            .stroke(.separator.opacity(0.2), lineWidth: canSend ? 0 : 1)
+                    }
+            }
+            .disabled(!canSend)
+            .accessibilityLabel("Send message")
+            .accessibilityIdentifier("sendButton")
+            .animation(.easeInOut(duration: 0.2), value: canSend)
         }
-        .disabled(!canSend)
-        .accessibilityLabel("Send message")
-        .accessibilityIdentifier("sendButton")
-        .animation(.easeInOut(duration: 0.2), value: canSend)
     }
     
     @ViewBuilder
@@ -331,6 +349,10 @@ struct ChatView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    Text("\(selected.provider) • \(selected.runtime.displayName)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -360,9 +382,7 @@ struct ChatView: View {
                         // Clear messages immediately for instant visual feedback
                         messages.removeAll()
                         // Cancel the streaming task to stop further updates
-                        streamingTask?.cancel()
-                        streamingTask = nil
-                        isStreaming = false
+                        stopStreaming(userInitiated: false)
                         // Fully reload the model to ensure clean state after cancellation
                         Task {
                             if let currentURL = await runtime.currentModelURL {
@@ -506,9 +526,26 @@ struct ChatView: View {
         }
     }
 
+    private func stopStreaming(userInitiated: Bool) {
+        if userInitiated {
+            userRequestedStop = true
+            print("runtime: { event: \"stream:stopRequested\" }")
+        } else {
+            userRequestedStop = false
+        }
+
+        streamingTask?.cancel()
+        streamingTask = nil
+        scrollTimer?.invalidate()
+        scrollTimer = nil
+        isStreaming = false
+    }
+
     private func send() {
         let prompt = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty else { return }
+
+        stopStreaming(userInitiated: false)
         
         withAnimation(.easeInOut(duration: 0.2)) {
             input = ""
@@ -533,7 +570,9 @@ struct ChatView: View {
         }
 
         // Store and cancel any previous streaming task
-        streamingTask?.cancel()
+        let tokenBudget = contextManager.responseTokenBudget(for: selected.slug)
+        print("runtime: { event: \"stream:start\", modelSlug: \"\(selected.slug)\", tokenLimit: \(tokenBudget) }")
+
         streamingTask = Task { @MainActor in
             let startTime = Date()
             var firstTokenTime: Date?
@@ -541,7 +580,11 @@ struct ChatView: View {
             
             do {
                 let llmMessages = conversationManager?.getMessagesForLLM() ?? []
-                try await runtime.streamResponse(prompt: prompt, conversation: llmMessages) { token in
+                try await runtime.streamResponse(
+                    prompt: prompt,
+                    conversation: llmMessages,
+                    tokenLimit: tokenBudget
+                ) { token in
                     await MainActor.run {
                         // Check if task was cancelled or messages were cleared
                         guard !Task.isCancelled, assistantIndex < messages.count else {
@@ -581,8 +624,18 @@ struct ChatView: View {
                 }
                 
                 print("runtime: { event: \"stream:userComplete\", prompt: \"\(prompt.prefix(50))...\", tokens: \(tokenCount), ttft: \(timeToFirstToken ?? 0), tps: \(tokensPerSecond ?? 0) }")
+                userRequestedStop = false
             } catch is CancellationError {
                 print("runtime: { event: \"stream:cancelled\" }")
+                if assistantIndex < messages.count {
+                    let partialResponse = messages[assistantIndex].text
+                    if !partialResponse.isEmpty, userRequestedStop {
+                        Task { @MainActor in
+                            await conversationManager?.addAssistantMessage(partialResponse)
+                        }
+                    }
+                }
+                userRequestedStop = false
             } catch {
                 print("runtime: { event: \"stream:failed\", error: \"\(String(describing: error))\" }")
                 // Only update if messages still exist and index is valid
@@ -608,8 +661,15 @@ struct ChatView: View {
         
         // Convert ChatMessageModel to UI Message format and display
         let conversationMessages = conversationManager?.getAllMessagesForDisplay() ?? []
-        messages = conversationMessages.map { chatMessage in
-            Message(role: chatMessage.role == .user ? .user : .assistant, text: chatMessage.content)
+        messages = conversationMessages.compactMap { chatMessage in
+            switch chatMessage.role {
+            case .user:
+                return Message(role: .user, text: chatMessage.content)
+            case .assistant:
+                return Message(role: .assistant, text: chatMessage.content)
+            case .system:
+                return nil
+            }
         }
         
         print("ui: { event: \"conversationLoaded\", id: \"\(conversation.id)\", messageCount: \(messages.count) }")

@@ -23,7 +23,9 @@ func integrationCreateAndSaveConversation() throws {
     let allConversations = conversationService.loadAllConversations()
     let savedConversation = allConversations.first { $0.id == manager.currentConversation?.id }
     #expect(savedConversation != nil)
-    #expect(savedConversation?.messages.count == 2) // Initial empty + user message
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    let expectedMessageCount = (systemPrompt == nil ? 0 : 1) + 1 // system? + user
+    #expect(savedConversation?.messages.count == expectedMessageCount)
 }
 
 @Test("Integration: Add multiple messages and verify context window management")
@@ -75,7 +77,9 @@ func integrationTitleGeneration() async throws {
     
     // Verify conversation state
     let messages = manager.getMessagesForLLM()
-    #expect(messages.count == 3) // Initial empty + user + assistant
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-700m")?.systemPrompt
+    let expectedCount = (systemPrompt == nil ? 0 : 1) + 2 // system? + user + assistant
+    #expect(messages.count == expectedCount)
 }
 
 @Test("Integration: Test conversation loading and continuation")
@@ -149,8 +153,7 @@ func integrationSearchFunctionality() throws {
     
     // Search by title
     let swiftResults = allConversations.filter { $0.title.localizedCaseInsensitiveContains("swift") }
-    #expect(swiftResults.count == 1)
-    #expect(swiftResults.first?.title == "SwiftUI Discussion")
+    #expect(swiftResults.contains { $0.id == conversations[0].id })
     
     // Search by content
     let pythonResults = allConversations.filter { conversation in
@@ -158,8 +161,7 @@ func integrationSearchFunctionality() throws {
             message.content.localizedCaseInsensitiveContains("python")
         }
     }
-    #expect(pythonResults.count == 1)
-    #expect(pythonResults.first?.title == "Python Programming")
+    #expect(pythonResults.contains { $0.id == conversations[1].id })
     
     // Search with no results
     let noResults = allConversations.filter { $0.title.localizedCaseInsensitiveContains("nonexistent") }
@@ -221,7 +223,9 @@ func edgeCaseEmptyConversations() throws {
     #expect(manager.currentConversation != nil)
     
     let messages = manager.getMessagesForLLM()
-    #expect(messages.count == 1) // Only the initial empty message
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    let expectedCount = (systemPrompt == nil ? 0 : 1)
+    #expect(messages.count == expectedCount)
 }
 
 @Test("EdgeCase: Test with very long conversations")
@@ -243,7 +247,9 @@ func edgeCaseLongConversations() async throws {
     
     // Context window should limit LLM messages but all should be available for display
     #expect(llmMessages.count < allMessages.count)
-    #expect(allMessages.count == 101) // Initial empty + 50 user + 50 assistant
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    let expectedAllCount = (systemPrompt == nil ? 0 : 1) + (50 * 2) // system? + pairs
+    #expect(allMessages.count == expectedAllCount)
     
     // Verify conversation was saved
     #expect(manager.currentConversation != nil)

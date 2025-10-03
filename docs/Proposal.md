@@ -38,7 +38,7 @@ Extend the existing LFM2 on-device chatbot to support downloading and running Ge
 - Support progress reporting in the same shape (0...1) to avoid UI churn. Translate file progress metrics into normalized percentages for Gemma downloads.
 
 ### 4. Runtime Execution Layer
-- Introduce a runtime adapter protocol (e.g., `ModelRuntimeAdapter`) that defines `load(at:)` and `streamResponse(prompt:onToken:)`.
+- Introduce a runtime adapter protocol (e.g., `ModelRuntimeAdapter`) that defines `load(at:)` and `streamResponse(prompt:conversation:tokenLimit:onToken:)`.
 - Keep the existing Leap-specific logic inside a `LeapRuntimeAdapter` (wrapping `Leap.load` and `Conversation.generateResponse`).
 - Add a `GemmaRuntimeAdapter` leveraging the sample's `GemmaInferenceService`. Key steps:
   - Build an inference service per Gemma asset that reuses cached `ModelContainer` and shares conversation -> `HubChat` conversion utilities.

@@ -9,14 +9,22 @@ struct ChatConversation: Codable, Identifiable, Equatable {
     var updatedAt: Date
     var modelSlug: String
     
-    init(modelSlug: String, initialMessage: ChatMessageModel? = nil) {
+    init(modelSlug: String, initialMessages: [ChatMessageModel]) {
         self.id = UUID()
         self.title = "New Conversation"
-        self.messages = initialMessage.map { [$0] } ?? []
+        self.messages = initialMessages
         self.archivedMessages = []
         self.createdAt = Date()
         self.updatedAt = Date()
         self.modelSlug = modelSlug
+    }
+
+    init(modelSlug: String, initialMessage: ChatMessageModel) {
+        self.init(modelSlug: modelSlug, initialMessages: [initialMessage])
+    }
+
+    init(modelSlug: String) {
+        self.init(modelSlug: modelSlug, initialMessages: [])
     }
     
     var allMessages: [ChatMessageModel] {

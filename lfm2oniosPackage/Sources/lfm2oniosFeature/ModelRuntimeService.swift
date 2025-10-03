@@ -62,6 +62,7 @@ public actor ModelRuntimeService {
     func streamResponse(
         prompt: String,
         conversation: [ChatMessageModel],
+        tokenLimit: Int,
         onToken: @Sendable @escaping (String) async -> Void
     ) async throws {
         guard let adapter else {
@@ -72,6 +73,7 @@ public actor ModelRuntimeService {
         try await adapter.streamResponse(
             prompt: prompt,
             conversation: conversation,
+            tokenLimit: tokenLimit,
             onToken: onToken
         )
     }

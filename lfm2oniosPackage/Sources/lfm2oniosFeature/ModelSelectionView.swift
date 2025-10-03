@@ -57,6 +57,16 @@ public struct ModelSelectionView: View {
                 Text(entry.shortDescription)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    Image(systemName: "person.3.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    Text("\(entry.provider) • \(entry.runtime.displayName)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
                 HStack(spacing: 12) {
                     Text("Context: \(entry.contextWindow)")
                         .font(.footnote)
@@ -173,5 +183,3 @@ public struct ModelSelectionView: View {
         tasks[entry.id] = task
     }
 }
-
-

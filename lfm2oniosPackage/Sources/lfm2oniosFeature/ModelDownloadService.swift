@@ -21,6 +21,7 @@ public enum ModelDownloadError: Error, Sendable {
     case invalidURL
     case unsupportedRuntime
     case missingMetadata
+    case missingToken
 }
 
 public struct ModelDownloadService: ModelDownloadServicing {

@@ -3,6 +3,15 @@ import Foundation
 public enum ModelRuntimeKind: String, Codable, Sendable {
     case leap
     case mlx
+
+    public var displayName: String {
+        switch self {
+        case .leap:
+            return "Leap"
+        case .mlx:
+            return "MLX"
+        }
+    }
 }
 
 public struct ModelCatalogEntry: Identifiable, Codable, Equatable, Sendable {
@@ -39,6 +48,7 @@ public struct ModelCatalogEntry: Identifiable, Codable, Equatable, Sendable {
     public let downloadURLString: String?
     public let runtime: ModelRuntimeKind
     public let gemmaMetadata: GemmaMetadata?
+    public let systemPrompt: String?
 
     public init(
         id: String,
@@ -51,7 +61,8 @@ public struct ModelCatalogEntry: Identifiable, Codable, Equatable, Sendable {
         shortDescription: String,
         downloadURLString: String?,
         runtime: ModelRuntimeKind,
-        gemmaMetadata: GemmaMetadata? = nil
+        gemmaMetadata: GemmaMetadata? = nil,
+        systemPrompt: String? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -64,6 +75,7 @@ public struct ModelCatalogEntry: Identifiable, Codable, Equatable, Sendable {
         self.downloadURLString = downloadURLString
         self.runtime = runtime
         self.gemmaMetadata = gemmaMetadata
+        self.systemPrompt = systemPrompt
     }
 }
 
@@ -124,9 +136,14 @@ public enum ModelCatalog {
                 primaryFilePath: "model.safetensors",
                 matchingGlobs: [
                     "model.safetensors",
-                    "tokenizer.json"
+                    "tokenizer.json",
+                    "tokenizer_config.json",
+                    "config.json",
+                    "generation_config.json",
+                    "special_tokens_map.json"
                 ]
-            )
+            ),
+            systemPrompt: "You are Gemma, an on-device assistant. Answer user questions directly with a short, factual reply. Do not repeat phrases or re-state that you are answering; simply provide the response and stop."
         )
     ]
 
@@ -134,4 +151,3 @@ public enum ModelCatalog {
         return all.first { $0.slug == slug || $0.id == slug }
     }
 }
-

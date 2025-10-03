@@ -11,9 +11,9 @@ This repository contains an iOS SwiftUI application scaffolded for iOS 17.2+. Ph
 
 
 ## Hugging Face Token (Gemma models)
-- Create a local config override: copy `Config/Shared.local.xcconfig.template` to `Config/Shared.local.xcconfig`.
-- Add your Hugging Face token: `LFM2ONIOS_HF_TOKEN = hf_xxxxxxxxxxxxxxxxx` (this file is git-ignored).
-- Alternatively set the token in Xcode’s scheme environment if you prefer. Avoid checking secrets into `xcshareddata`.
+- Copy `Config/Shared.local.xcconfig.template` to `Config/Shared.local.xcconfig` and set `LFM2ONIOS_HF_TOKEN = hf_xxxxxxxxxxxxxxxxx` (file is git-ignored).
+- OR copy `Config/Environment.plist.template` to `Config/Environment.plist`, add your token, and ensure the plist is added to the app target’s bundle resources (it is git-ignored by default).
+- You can also set the token in the scheme’s environment variables during development. Avoid committing any real secrets.
 
 ## Prerequisites
 - Xcode 15+ (with iOS 17.2+ SDK; tests also run on iOS 18.x simulators)

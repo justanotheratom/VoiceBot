@@ -33,7 +33,7 @@ func runtimeServiceState() async throws {
     
     // Test error when trying to stream without loading a model
     do {
-        try await svc.streamResponse(prompt: "test", conversation: []) { _ in }
+        try await svc.streamResponse(prompt: "test", conversation: [], tokenLimit: 16) { _ in }
         #expect(Bool(false), "Should throw error when no model loaded")
     } catch ModelRuntimeError.notLoaded {
         // Expected error
@@ -313,12 +313,21 @@ func contextWindowManagerLimits() {
     let manager = ContextWindowManager()
     
     // Test known models
-    #expect(manager.getContextLimit(for: "lfm2-350m") == 4096)
-    #expect(manager.getContextLimit(for: "lfm2-700m") == 4096)
-    #expect(manager.getContextLimit(for: "lfm2-1.2b") == 4096)
+    #expect(manager.getContextLimit(for: "lfm2-350m") == ModelCatalog.entry(forSlug: "lfm2-350m")?.contextWindow)
+    #expect(manager.getContextLimit(for: "lfm2-700m") == ModelCatalog.entry(forSlug: "lfm2-700m")?.contextWindow)
+    #expect(manager.getContextLimit(for: "lfm2-1.2b") == ModelCatalog.entry(forSlug: "lfm2-1.2b")?.contextWindow)
+    #expect(manager.getContextLimit(for: "gemma3-270m") == ModelCatalog.entry(forSlug: "gemma3-270m")?.contextWindow)
+    
+    let baseLimit = manager.getContextLimit(for: "lfm2-350m")
+    let responseBudget = manager.responseTokenBudget(for: "lfm2-350m")
+    #expect(responseBudget == Int(Double(baseLimit) * 0.30))
+
+    let gemmaBudget = manager.responseTokenBudget(for: "gemma3-270m")
+    #expect(gemmaBudget == 512)
     
     // Test unknown model defaults to 4096
     #expect(manager.getContextLimit(for: "unknown-model") == 4096)
+    #expect(manager.responseTokenBudget(for: "unknown-model") >= 128)
 }
 
 @Test("ContextWindowManager archiving logic works")

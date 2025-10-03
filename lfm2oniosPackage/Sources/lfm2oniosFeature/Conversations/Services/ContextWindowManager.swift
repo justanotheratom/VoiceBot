@@ -4,18 +4,31 @@ import os.log
 struct ContextWindowManager {
     private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "context")
     
-    // Model context limits (in tokens)
-    private let modelContextLimits: [String: Int] = [
-        "lfm2-350m": 4096,
-        "lfm2-700m": 4096,
-        "lfm2-1.2b": 4096
-        // Add more models as needed
-    ]
+    private let defaultContextLimit = 4096
     
     func getContextLimit(for modelSlug: String) -> Int {
-        let limit = modelContextLimits[modelSlug] ?? 4096
+        let limit = ModelCatalog.entry(forSlug: modelSlug)?.contextWindow ?? defaultContextLimit
         logger.debug("context: { event: \"getLimit\", model: \"\(modelSlug)\", limit: \(limit) }")
         return limit
+    }
+
+    func responseTokenBudget(for modelSlug: String) -> Int {
+        let contextLimit = getContextLimit(for: modelSlug)
+        let reserved = Int(Double(contextLimit) * 0.30)
+        var budget = max(reserved, 128)
+
+        if let entry = ModelCatalog.entry(forSlug: modelSlug) {
+            switch entry.runtime {
+            case .mlx:
+                budget = min(budget, 512)
+            case .leap:
+                break
+            }
+        } else {
+            budget = min(budget, 512)
+        }
+        logger.debug("context: { event: \"responseBudget\", model: \"\(modelSlug)\", budget: \(budget) }")
+        return budget
     }
     
     func estimateTokenCount(_ text: String) -> Int {

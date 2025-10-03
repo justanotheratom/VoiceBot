@@ -40,6 +40,7 @@ final actor GemmaRuntimeAdapter: ModelRuntimeAdapting {
     func streamResponse(
         prompt: String,
         conversation: [ChatMessageModel],
+        tokenLimit: Int,
         onToken: @Sendable @escaping (String) async -> Void
     ) async throws {
         guard let inferenceService else {
@@ -52,8 +53,12 @@ final actor GemmaRuntimeAdapter: ModelRuntimeAdapting {
             conversationForModel.append(ChatMessageModel(role: .user, content: prompt))
         }
 
-        let stream = try await inferenceService.tokenStream(conversation: conversationForModel)
+        let rolesSummary = conversationForModel.map { $0.role.rawValue }.joined(separator: ",")
+        print("runtime: { event: \"gemma:conversation\", roles: \"\(rolesSummary)\", count: \(conversationForModel.count) }")
+
+        let stream = try await inferenceService.tokenStream(conversation: conversationForModel, maxTokens: tokenLimit)
         for try await token in stream {
+            try Task.checkCancellation()
             await onToken(token)
         }
     }

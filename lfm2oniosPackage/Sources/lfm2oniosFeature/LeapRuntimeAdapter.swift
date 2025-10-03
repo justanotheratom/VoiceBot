@@ -36,6 +36,7 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
     func streamResponse(
         prompt: String,
         conversation: [ChatMessageModel],
+        tokenLimit: Int,
         onToken: @Sendable @escaping (String) async -> Void
     ) async throws {
         guard let runner = modelRunner else {
@@ -46,12 +47,20 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
         let historyMessages = history.map(convertToLeapMessage)
         let conversation = Conversation(modelRunner: runner, history: historyMessages)
         let userMessage = ChatMessage(role: .user, content: [.text(userPrompt)])
+        var generatedTokenEstimate = 0
 
         do {
             for try await response in conversation.generateResponse(message: userMessage) {
+                try Task.checkCancellation()
                 switch response {
                 case .chunk(let text):
+                    guard !text.isEmpty else { continue }
                     await onToken(text)
+                    generatedTokenEstimate += Self.estimateTokenCount(for: text)
+                    if generatedTokenEstimate >= tokenLimit {
+                        print("runtime: { event: \"leap:tokenLimitReached\", limit: \(tokenLimit), estimatedTokens: \(generatedTokenEstimate) }")
+                        return
+                    }
                 case .reasoningChunk(_), .functionCall(_):
                     continue
                 case .complete(_, _):
@@ -61,10 +70,15 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
                 }
             }
         } catch is CancellationError {
-            throw ModelRuntimeError.cancelled
+            throw CancellationError()
         } catch {
             throw ModelRuntimeError.underlying(String(describing: error))
         }
+    }
+
+    private static func estimateTokenCount(for chunk: String) -> Int {
+        let components = chunk.split { $0.isWhitespace }
+        return max(components.count, 1)
     }
 
     private func validateModel(at url: URL) throws {

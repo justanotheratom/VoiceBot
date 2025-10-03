@@ -26,13 +26,13 @@ class TitleGenerationService {
     
     func generateTitle(for conversation: ChatConversation) async -> String {
         // Only generate if we have at least one user message and one assistant response
-        guard conversation.messages.count >= 2,
-              conversation.messages.first?.role == .user else {
+        guard let userMessageModel = conversation.messages.first(where: { $0.role == .user }),
+              let assistantMessageModel = conversation.messages.first(where: { $0.role == .assistant }) else {
             return fallbackTitle()
         }
         
-        let userMessage = conversation.messages.first!.content
-        let assistantMessage = conversation.messages.count > 1 ? conversation.messages[1].content : ""
+        let userMessage = userMessageModel.content
+        let assistantMessage = assistantMessageModel.content
         
         let prompt = createTitlePrompt(userMessage: userMessage, assistantMessage: assistantMessage)
         
@@ -49,7 +49,11 @@ class TitleGenerationService {
             let titleAccumulator = TitleAccumulator()
             
             // Use the existing streamResponse method to generate title
-            try await modelRuntimeService.streamResponse(prompt: prompt, conversation: []) { token in
+            try await modelRuntimeService.streamResponse(
+                prompt: prompt,
+                conversation: [],
+                tokenLimit: 64
+            ) { token in
                 await titleAccumulator.append(token)
             }
             

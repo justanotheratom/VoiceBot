@@ -7,6 +7,7 @@ protocol ModelRuntimeAdapting: Sendable {
     func streamResponse(
         prompt: String,
         conversation: [ChatMessageModel],
+        tokenLimit: Int,
         onToken: @Sendable @escaping (String) async -> Void
     ) async throws
 }
