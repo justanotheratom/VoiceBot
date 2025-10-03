@@ -34,13 +34,18 @@ public actor ModelRuntimeService {
             return
         }
 
-        try await adapter!.loadModel(at: url, entry: entry)
+        guard let currentAdapter = adapter else {
+            print("runtime: { event: \"preload:error\", slug: \"\(entry.slug)\", reason: \"adapterMissing\" }")
+            throw ModelRuntimeError.notLoaded
+        }
+
+        try await currentAdapter.loadModel(at: url, entry: entry)
         loadedURL = url
         currentEntryID = entry.id
 
         print("runtime: { event: \"preload:start\", slug: \"\(entry.slug)\" }")
         do {
-            try await adapter!.preload()
+            try await currentAdapter.preload()
             print("runtime: { event: \"preload:complete\", slug: \"\(entry.slug)\" }")
         } catch {
             print("runtime: { event: \"preload:failed\", slug: \"\(entry.slug)\", error: \"\(error.localizedDescription)\" }")
