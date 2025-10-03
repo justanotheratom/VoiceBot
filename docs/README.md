@@ -9,6 +9,12 @@ This repository contains an iOS SwiftUI application scaffolded for iOS 17.2+. Ph
 – Unified logging via `os.Logger` with subsystem `com.oneoffrepo.lfm2onios` and categories `app`, `download`, `runtime`, `ui`.
 – Leap iOS SDK (v0.5.0) integrated via SPM and linkage verified at startup.
 
+
+## Hugging Face Token (Gemma models)
+- Create a local config override: copy `Config/Shared.local.xcconfig.template` to `Config/Shared.local.xcconfig`.
+- Add your Hugging Face token: `LFM2ONIOS_HF_TOKEN = hf_xxxxxxxxxxxxxxxxx` (this file is git-ignored).
+- Alternatively set the token in Xcode’s scheme environment if you prefer. Avoid checking secrets into `xcshareddata`.
+
 ## Prerequisites
 - Xcode 15+ (with iOS 17.2+ SDK; tests also run on iOS 18.x simulators)
 - macOS with command line tools installed

@@ -4,17 +4,17 @@ import OSLog
 
 enum GemmaHubClient {
     static let shared: HubApi = {
+        guard let token = GemmaHubTokenProvider.huggingFaceToken() else {
+            preconditionFailure("LFM2ONIOS_HF_TOKEN must be set in the environment or Info.plist for Gemma downloads")
+        }
+
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
         let base = caches?.appendingPathComponent("huggingface", isDirectory: true)
-        let token = GemmaHubTokenProvider.huggingFaceToken()
         if let base {
             try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
             return HubApi(downloadBase: base, hfToken: token)
         }
-        if let token {
-            return HubApi(hfToken: token)
-        }
-        return HubApi()
+        return HubApi(hfToken: token)
     }()
 }
 
@@ -34,7 +34,7 @@ enum GemmaHubTokenProvider {
             return infoValue
         }
 
-        logger.debug("No Hugging Face token configured; relying on anonymous access")
+        logger.error("No Hugging Face token configured. Set LFM2ONIOS_HF_TOKEN in the environment or Info.plist")
         return nil
     }
 }

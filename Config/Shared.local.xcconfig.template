@@ -1,0 +1,3 @@
+// Copy to Shared.local.xcconfig and fill in secrets.
+// This file is for documentation only; do not commit real tokens.
+LFM2ONIOS_HF_TOKEN = hf_yourTokenHere

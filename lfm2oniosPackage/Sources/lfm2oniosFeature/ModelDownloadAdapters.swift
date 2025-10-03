@@ -15,24 +15,16 @@ struct LeapModelDownloadAdapter: RuntimeModelDownloadAdapting {
         entry: ModelCatalogEntry,
         progress: @Sendable @escaping (Double) -> Void
     ) async throws -> URL {
-        print("download: { event: \"ENTRY\", modelSlug: \"\(entry.slug)\" }")
-        print("download: { event: \"resolve\", modelSlug: \"\(entry.slug)\" }")
-
         guard let urlString = entry.downloadURLString,
               let filename = extractFilename(from: urlString) else {
             print("download: { event: \"failed\", error: \"invalidURL\", url: \"\(entry.downloadURLString ?? "nil")\" }")
             throw ModelDownloadError.invalidURL
         }
-
-        print("download: { event: \"creatingHuggingFaceModel\", filename: \"\(filename)\" }")
-
         let hfModel = HuggingFaceDownloadableModel(
             ownerName: "LiquidAI",
             repoName: "LeapBundles",
             filename: filename
         )
-
-        print("download: { event: \"startingLeapDownload\", ownerName: \"LiquidAI\", repoName: \"LeapBundles\", filename: \"\(filename)\" }")
 
         do {
             let result = try await downloadWithLeapDownloader(model: hfModel, progress: progress)
@@ -48,7 +40,6 @@ struct LeapModelDownloadAdapter: RuntimeModelDownloadAdapting {
             try fm.createDirectory(at: expectedURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try fm.moveItem(at: result, to: expectedURL)
 
-            print("download: { event: \"complete\", modelSlug: \"\(entry.slug)\", localPath: \"\(expectedURL.path)\" }")
             return expectedURL
         } catch {
             print("download: { event: \"failed\", modelSlug: \"\(entry.slug)\", error: \"\(String(describing: error))\" }")
@@ -60,11 +51,7 @@ struct LeapModelDownloadAdapter: RuntimeModelDownloadAdapting {
         model: HuggingFaceDownloadableModel,
         progress: @Sendable @escaping (Double) -> Void
     ) async throws -> URL {
-        print("download: { event: \"creatingDownloader\", model: \"\(model.filename)\" }")
-
         let downloader = ModelDownloader()
-
-        print("download: { event: \"requestingDownload\", model: \"\(model.filename)\" }")
         downloader.requestDownloadModel(model)
 
         var lastProgress: Double = 0
@@ -73,26 +60,21 @@ struct LeapModelDownloadAdapter: RuntimeModelDownloadAdapting {
 
             switch status {
             case .notOnLocal:
-                print("download: { event: \"statusNotOnLocal\", model: \"\(model.filename)\" }")
                 try await Task.sleep(nanoseconds: 500_000_000)
 
             case .downloadInProgress(let currentProgress):
                 if currentProgress != lastProgress {
                     lastProgress = currentProgress
                     progress(currentProgress)
-                    print("download: { event: \"progress\", model: \"\(model.filename)\", progress: \(Int(currentProgress * 100))% }")
                 }
                 try await Task.sleep(nanoseconds: 200_000_000)
 
             case .downloaded:
                 progress(1.0)
-                print("download: { event: \"statusDownloaded\", model: \"\(model.filename)\" }")
                 let url = downloader.getModelFile(model)
-                print("download: { event: \"leapDownloadSuccess\", url: \"\(url.path)\" }")
                 return url
 
             @unknown default:
-                print("download: { event: \"unknownStatus\", model: \"\(model.filename)\" }")
                 try await Task.sleep(nanoseconds: 500_000_000)
             }
 
@@ -129,8 +111,6 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
             throw ModelDownloadError.missingMetadata
         }
 
-        print("download: { event: \"gemma:start\", slug: \"\(entry.slug)\", repoID: \"\(metadata.repoID)\", revision: \"\(metadata.revision)\" }")
-
         let storage = ModelStorageService()
         let destinationDirectory = try storage.expectedGemmaDirectoryURL(for: entry)
 
@@ -147,17 +127,23 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
 
         let repo = Hub.Repo(id: metadata.repoID)
 
-        let snapshotURL = try await hub.snapshot(
-            from: repo,
-            revision: metadata.revision,
-            matching: metadata.matchingGlobs
-        ) { hubProgress in
-            let total = hubProgress.totalUnitCount
-            let completed = hubProgress.completedUnitCount
-            if total > 0 {
-                let fraction = min(max(Double(completed) / Double(total), 0), 1)
-                progress(fraction)
+        let snapshotURL: URL
+        do {
+            snapshotURL = try await hub.snapshot(
+                from: repo,
+                revision: metadata.revision,
+                matching: metadata.matchingGlobs
+            ) { hubProgress in
+                let total = hubProgress.totalUnitCount
+                let completed = hubProgress.completedUnitCount
+                if total > 0 {
+                    let fraction = min(max(Double(completed) / Double(total), 0), 1)
+                    progress(fraction)
+                }
             }
+        } catch {
+            print("download: { event: \"gemma:snapshotFailed\", error: \"\(error.localizedDescription)\" }")
+            throw ModelDownloadError.underlying("Hub snapshot failed: \(error.localizedDescription)")
         }
 
         defer {
@@ -166,7 +152,13 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
 
         try Task.checkCancellation()
 
-        try promoteSnapshot(from: snapshotURL, to: destinationDirectory)
+        do {
+            try promoteSnapshot(from: snapshotURL, to: destinationDirectory)
+            try flattenPrivateDirectoryIfNeeded(at: destinationDirectory)
+        } catch {
+            print("download: { event: \"gemma:promoteFailed\", error: \"\(error.localizedDescription)\" }")
+            throw ModelDownloadError.underlying("Failed to prepare Gemma assets: \(error.localizedDescription)")
+        }
 
         let primaryFile = destinationDirectory.appendingPathComponent(metadata.primaryFilePath)
         if !fileManager.fileExists(atPath: primaryFile.path) {
@@ -175,7 +167,6 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
         }
 
         progress(1.0)
-        print("download: { event: \"gemma:complete\", slug: \"\(entry.slug)\", path: \"\(destinationDirectory.path)\" }")
         return destinationDirectory
     }
 
@@ -208,5 +199,22 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
                 try fileManager.copyItem(at: item, to: target)
             }
         }
+
+    }
+
+    private func flattenPrivateDirectoryIfNeeded(at destination: URL) throws {
+        let fileManager = FileManager.default
+        let privateDir = destination.appendingPathComponent("private", isDirectory: true)
+        guard fileManager.fileExists(atPath: privateDir.path) else { return }
+
+        let items = try fileManager.contentsOfDirectory(at: privateDir, includingPropertiesForKeys: nil)
+        for item in items {
+            let target = destination.appendingPathComponent(item.lastPathComponent, isDirectory: item.hasDirectoryPath)
+            if fileManager.fileExists(atPath: target.path) {
+                try fileManager.removeItem(at: target)
+            }
+            try fileManager.moveItem(at: item, to: target)
+        }
+        try fileManager.removeItem(at: privateDir)
     }
 }
