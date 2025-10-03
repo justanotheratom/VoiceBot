@@ -88,7 +88,7 @@ Extend the existing LFM2 on-device chatbot to support downloading and running Ge
    - Extract current Leap download flow into `LeapDownloadAdapter` satisfying a new `ModelDownloadAdapter` protocol.
    - Port `ModelAssetDescriptor`, `ModelStorage`, `ModelHubClient`, and simplified `ModelDownloadController` from the sample into the package; wrap in `GemmaDownloadAdapter` with normalized progress callbacks.
    - Implement a unified `ModelDownloadService` facade that selects the correct adapter and maintains task cancellation bookkeeping for the UI.
-4. **Runtime adapters**
+4. **Runtime adapters** *(completed)*
    - Move Leap-specific logic into `LeapRuntimeAdapter` and introduce `GemmaRuntimeAdapter` built on `GemmaInferenceService` (adapted from sample).
    - Refactor `ModelRuntimeService` to route load/stream requests to the active adapter, handle unloading when switching models, and normalize error surfaces.
 5. **Chat integration & UX polish**

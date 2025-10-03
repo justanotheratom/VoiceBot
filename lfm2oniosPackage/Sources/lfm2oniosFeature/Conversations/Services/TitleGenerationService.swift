@@ -49,7 +49,7 @@ class TitleGenerationService {
             let titleAccumulator = TitleAccumulator()
             
             // Use the existing streamResponse method to generate title
-            try await modelRuntimeService.streamResponse(prompt: prompt) { token in
+            try await modelRuntimeService.streamResponse(prompt: prompt, conversation: []) { token in
                 await titleAccumulator.append(token)
             }
             

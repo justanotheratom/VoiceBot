@@ -1,7 +1,5 @@
 import Foundation
 
-@preconcurrency import LeapSDK
-
 public enum ModelRuntimeError: Error, Sendable {
     case invalidURL
     case fileMissing
@@ -11,277 +9,70 @@ public enum ModelRuntimeError: Error, Sendable {
     case underlying(String)
 }
 
-/// Actor responsible for managing model lifecycle and generating responses.
-/// Requires real model files - no simulation fallback.
 public actor ModelRuntimeService {
+    private var adapter: (any ModelRuntimeAdapting)?
+    private var currentRuntime: ModelRuntimeKind?
+    private var currentEntryID: String?
     private var loadedURL: URL?
-    private var modelRunner: ModelRunner?
-    private var conversation: Conversation?
 
     public init() {}
 
-    /// Load a model bundle from a local URL. Safe to call repeatedly; it will no-op if already loaded for the same URL.
-    /// Throws an error if the model cannot be loaded - no simulation fallback.
-    public func loadModel(at url: URL) async throws {
-        print("runtime: { event: \"load:entry\", url: \"\(url.absoluteString)\", urlPath: \"\(url.path)\", currentLoaded: \"\(loadedURL?.absoluteString ?? "none")\" }")
-        
-        if loadedURL == url { 
-            print("runtime: { event: \"load:skipped\", reason: \"alreadyLoaded\" }")
-            return 
+    public func loadModel(entry: ModelCatalogEntry, at url: URL) async throws {
+        if currentRuntime != entry.runtime {
+            await adapter?.unload()
+            adapter = nil
+            loadedURL = nil
+            currentEntryID = nil
         }
-        
-        print("runtime: { event: \"load:start\", url: \"\(url.absoluteString)\" }")
-        
-        let fm = FileManager.default
-        var isDir: ObjCBool = false
-        
-        // Log basic file system info
-        print("runtime: { event: \"load:checkingPath\", path: \"\(url.path)\", exists: \(fm.fileExists(atPath: url.path)) }")
-        
-        // Verify the bundle exists (can be file or directory)
-        guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else {
-            print("runtime: { event: \"load:failed\", error: \"bundleMissing\", path: \"\(url.path)\", exists: false }")
-            throw ModelRuntimeError.fileMissing
-        }
-        
-        if isDir.boolValue {
-            // Bundle as directory - verify contents
-            print("runtime: { event: \"load:bundleExists\", path: \"\(url.path)\", type: \"directory\" }")
-            
-            let bundleContents: [String]
-            do {
-                bundleContents = try fm.contentsOfDirectory(atPath: url.path)
-                print("runtime: { event: \"load:bundleContents\", fileCount: \(bundleContents.count), files: \(bundleContents.prefix(10)) }")
-            } catch {
-                print("runtime: { event: \"load:failed\", error: \"cannotReadBundle\", path: \"\(url.path)\", underlyingError: \"\(String(describing: error))\" }")
-                throw ModelRuntimeError.fileMissing
-            }
-            
-            guard !bundleContents.isEmpty else {
-                print("runtime: { event: \"load:failed\", error: \"emptyBundle\", path: \"\(url.path)\" }")
-                throw ModelRuntimeError.fileMissing
-            }
-            
-            print("runtime: { event: \"load:bundleVerified\", files: \(bundleContents.count) }")
-        } else {
-            // Bundle as file (ZIP archive) - verify size
-            print("runtime: { event: \"load:bundleExists\", path: \"\(url.path)\", type: \"file\" }")
-            
-            do {
-                let attrs = try fm.attributesOfItem(atPath: url.path)
-                let fileSize = attrs[.size] as? Int64 ?? 0
-                print("runtime: { event: \"load:bundleFileSize\", size: \(fileSize) }")
-                
-                guard fileSize > 1024 else {
-                    print("runtime: { event: \"load:failed\", error: \"bundleTooSmall\", size: \(fileSize) }")
-                    throw ModelRuntimeError.fileMissing
-                }
-            } catch {
-                print("runtime: { event: \"load:failed\", error: \"cannotReadBundleAttrs\", path: \"\(url.path)\", error: \"\(error.localizedDescription)\" }")
-                throw ModelRuntimeError.fileMissing
-            }
-        }
-        
-        // Use the original URL directly - LeapSDK should handle both file and directory bundles
-        let loadURL = url
-        
-        // Log warning if path contains spaces
-        if url.path.contains(" ") {
-            print("runtime: { event: \"load:warning\", message: \"Path contains spaces which may cause issues\", path: \"\(url.path)\" }")
-        }
-        
-        // Check if LeapSDK is available
-        #if canImport(LeapSDK)
-        print("runtime: { event: \"load:leapSDKCheck\", available: true }")
-        
-        // Check LeapSDK version and capabilities
-        if LeapIntegration.isSDKAvailable {
-            let version = LeapIntegration.sdkVersionString() ?? "unknown"
-            print("runtime: { event: \"load:leapSDKVersion\", version: \"\(version)\", isAvailable: true }")
-        } else {
-            print("runtime: { event: \"load:leapSDKVersion\", version: \"unavailable\", isAvailable: false }")
-        }
-        #else
-        print("runtime: { event: \"load:leapSDKCheck\", available: false }")
-        throw ModelRuntimeError.leapSDKUnavailable
-        #endif
-        
-        // Additional file checks - only for directory bundles
-        if isDir.boolValue {
-            // Directory bundle - check actual model files
-            let modelFiles = ["model.pte", "model.pte.enc", "config.yaml", "tokenizer.json", "tokenizer_config.json", "chat_template.jinja"]
-            for file in modelFiles {
-                let filePath = url.appendingPathComponent(file)
-                let exists = fm.fileExists(atPath: filePath.path)
-                if exists {
-                    if let attrs = try? fm.attributesOfItem(atPath: filePath.path),
-                       let size = attrs[.size] as? Int {
-                        print("runtime: { event: \"load:modelFile\", file: \"\(file)\", exists: true, size: \(size) }")
-                    } else {
-                        print("runtime: { event: \"load:modelFile\", file: \"\(file)\", exists: true, size: \"unknown\" }")
-                    }
-                } else {
-                    print("runtime: { event: \"load:modelFile\", file: \"\(file)\", exists: false }")
-                }
-            }
-            
-            // Try to read config.yaml to understand model requirements
-            let configPath = loadURL.appendingPathComponent("config.yaml")
-            if let configData = try? Data(contentsOf: configPath),
-               let configString = String(data: configData, encoding: .utf8) {
-                print("runtime: { event: \"load:config\", content: \"\(configString.replacingOccurrences(of: "\n", with: "\\n"))\" }")
-            }
-            
-            // Validate model file integrity before loading (directory bundles only)
-            let modelPath = loadURL.appendingPathComponent("model.pte")
-            guard fm.fileExists(atPath: modelPath.path) else {
-                print("runtime: { event: \"load:failed\", error: \"modelFileNotFound\", path: \"\(modelPath.path)\" }")
-                throw ModelRuntimeError.fileMissing
-            }
-            
-            // Check model file size and basic validation
-            do {
-                let attributes = try fm.attributesOfItem(atPath: modelPath.path)
-                let fileSize = attributes[.size] as? Int64 ?? 0
-                print("runtime: { event: \"load:modelValidation\", size: \(fileSize), path: \"\(modelPath.path)\" }")
-                
-                // Model file should be at least 1MB for a valid model
-                guard fileSize > 1024 * 1024 else {
-                    print("runtime: { event: \"load:failed\", error: \"modelFileTooSmall\", size: \(fileSize) }")
-                    throw ModelRuntimeError.underlying("Model file is too small to be valid")
-                }
-                
-                // Read first 32 bytes to validate format
-                if let fileHandle = try? FileHandle(forReadingFrom: modelPath) {
-                    defer { try? fileHandle.close() }
-                    let headerData = fileHandle.readData(ofLength: 32)
-                    let headerHex = headerData.map { String(format: "%02hhx", $0) }.joined()
-                    let headerString = String(data: headerData, encoding: .ascii) ?? ""
-                    print("runtime: { event: \"load:modelHeader\", headerBytes: \(headerData.count), headerHex: \"\(headerHex)\", ascii: \"\(headerString)\" }")
-                }
-            } catch {
-                print("runtime: { event: \"load:validationFailed\", error: \"\(error)\" }")
-                throw ModelRuntimeError.fileMissing
-            }
-        } else {
-            // File bundle (ZIP) - LeapSDK will validate contents internally
-            print("runtime: { event: \"load:skipValidation\", reason: \"zipBundle\", path: \"\(url.path)\" }")
-        }
-        
-        // Load the model with LeapSDK - no fallback
-        do {
-            print("runtime: { event: \"load:callingLeapLoad\", url: \"\(loadURL.absoluteString)\", path: \"\(loadURL.path)\" }")
-            
-            let runner = try await Leap.load(url: loadURL)
-            
-            print("runtime: { event: \"load:leapLoadSucceeded\", runner: \"\(String(describing: runner))\", runnerType: \"\(type(of: runner))\" }")
-            
-            self.modelRunner = runner
-            // Start with empty history; system prompts can be added later
-            self.conversation = Conversation(modelRunner: runner, history: [])
-            loadedURL = url
-            print("runtime: { event: \"load:success\", finalUrl: \"\(url.absoluteString)\" }")
-        } catch {
-            let errorDescription = String(describing: error)
-            let errorType = String(describing: type(of: error))
-            print("runtime: { event: \"load:failed\", error: \"\(errorDescription)\", errorType: \"\(errorType)\", localizedDescription: \"\(error.localizedDescription)\" }")
-            
-            // Try to get more error details
-            if let nsError = error as NSError? {
-                print("runtime: { event: \"load:failedNSError\", domain: \"\(nsError.domain)\", code: \(nsError.code), userInfo: \"\(nsError.userInfo)\" }")
-            }
-            
-            // Check for specific error types
-            if errorDescription.contains("Executorch Error 34") {
-                print("runtime: { event: \"load:executorchError34\", hint: \"Model file format may be incompatible or corrupted\" }")
-                throw ModelRuntimeError.underlying("Model file format is incompatible. Error 34 typically indicates the model file cannot be parsed by the executorch backend.")
-            } else if errorDescription.contains("loadError") {
-                throw ModelRuntimeError.underlying("Failed to load model. The model file may be corrupted or in an unsupported format.")
-            }
-            
-            throw ModelRuntimeError.underlying(errorDescription)
-        }
-    }
 
-    /// Safely unloads the current model and clears the conversation.
-    /// This should be called when switching models to ensure proper cleanup.
-    public func unloadModel() async {
-        print("runtime: { event: \"unload:start\", hadModel: \(modelRunner != nil), hadConversation: \(conversation != nil) }")
-        
-        conversation = nil
-        modelRunner = nil
-        loadedURL = nil
-        
-        print("runtime: { event: \"unload:complete\" }")
-    }
-    
-    /// Returns whether a model is currently loaded.
-    public var isModelLoaded: Bool {
-        return modelRunner != nil && loadedURL != nil
-    }
-    
-    /// Returns the URL of the currently loaded model, if any.
-    public var currentModelURL: URL? {
-        return loadedURL
-    }
-    
-    /// Resets the conversation state without unloading the model.
-    /// This creates a fresh conversation with the same model, useful for clearing history after cancellation.
-    public func resetConversation() async {
-        guard let runner = modelRunner else {
-            print("runtime: { event: \"reset:noModel\" }")
+        if adapter == nil {
+            adapter = ModelRuntimeAdapterFactory.makeAdapter(for: entry.runtime)
+            currentRuntime = entry.runtime
+        }
+
+        if loadedURL == url, currentEntryID == entry.id {
             return
         }
-        
-        print("runtime: { event: \"reset:conversation\" }")
-        // Create a fresh conversation with empty history
-        self.conversation = Conversation(modelRunner: runner, history: [])
-        print("runtime: { event: \"reset:complete\" }")
+
+        try await adapter!.loadModel(at: url, entry: entry)
+        loadedURL = url
+        currentEntryID = entry.id
     }
 
-    /// Streams a response for the given prompt. Calls `onToken` as partial text chunks arrive.
-    /// Requires a real loaded model - no simulation fallback.
-    public func streamResponse(
+    public func unloadModel() async {
+        await adapter?.unload()
+        adapter = nil
+        currentRuntime = nil
+        currentEntryID = nil
+        loadedURL = nil
+    }
+
+    public func resetConversation() async {
+        await adapter?.resetConversation()
+    }
+
+    public var isModelLoaded: Bool {
+        loadedURL != nil
+    }
+
+    public var currentModelURL: URL? {
+        loadedURL
+    }
+
+    func streamResponse(
         prompt: String,
+        conversation: [ChatMessageModel],
         onToken: @Sendable @escaping (String) async -> Void
     ) async throws {
-        guard loadedURL != nil else { 
+        guard let adapter else {
             print("runtime: { event: \"stream:error\", reason: \"noModelLoaded\" }")
-            throw ModelRuntimeError.notLoaded 
-        }
-        
-        guard let conversation else {
-            print("runtime: { event: \"stream:error\", reason: \"noConversation\" }")
             throw ModelRuntimeError.notLoaded
         }
 
-        print("runtime: { event: \"stream:start\" }")
-
-        var tokenCount = 0
-        let userMessage = ChatMessage(role: .user, content: [.text(prompt)])
-        
-        do {
-            for try await response in conversation.generateResponse(message: userMessage) {
-                try Task.checkCancellation()
-                switch response {
-                case .chunk(let text):
-                    tokenCount += 1
-                    await onToken(text)
-                case .reasoningChunk(_):
-                    // Ignore in UI for now; could surface in a dev HUD
-                    continue
-                case .functionCall(_):
-                    // Function calling not implemented in MVP; continue
-                    continue
-                case .complete(let usage, let reason):
-                    print("runtime: { event: \"stream:complete\", tokens: \(tokenCount), finishReason: \"\(reason)\", usage: \(String(describing: usage)) }")
-                @unknown default:
-                    break
-                }
-            }
-        } catch {
-            print("runtime: { event: \"stream:error\", error: \"\(String(describing: error))\" }")
-            throw ModelRuntimeError.underlying(String(describing: error))
-        }
+        try await adapter.streamResponse(
+            prompt: prompt,
+            conversation: conversation,
+            onToken: onToken
+        )
     }
 }

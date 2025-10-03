@@ -33,7 +33,7 @@ func runtimeServiceState() async throws {
     
     // Test error when trying to stream without loading a model
     do {
-        try await svc.streamResponse(prompt: "test") { token in }
+        try await svc.streamResponse(prompt: "test", conversation: []) { _ in }
         #expect(Bool(false), "Should throw error when no model loaded")
     } catch ModelRuntimeError.notLoaded {
         // Expected error

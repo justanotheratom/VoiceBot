@@ -18,7 +18,9 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/Liquid4All/leap-ios.git", from: "0.5.0"),
-        .package(url: "https://github.com/huggingface/swift-transformers", from: "1.0.0")
+        .package(url: "https://github.com/huggingface/swift-transformers", from: "1.0.0"),
+        .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.25.6"),
+        .package(url: "https://github.com/ml-explore/mlx-swift-examples", branch: "main")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -28,7 +30,16 @@ let package = Package(
             dependencies: [
                 .product(name: "LeapSDK", package: "leap-ios"),
                 .product(name: "LeapModelDownloader", package: "leap-ios"),
-                .product(name: "Hub", package: "swift-transformers")
+                .product(name: "Hub", package: "swift-transformers"),
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "MLXOptimizers", package: "mlx-swift"),
+                .product(name: "MLXRandom", package: "mlx-swift"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-examples"),
+                .product(name: "MLXLLM", package: "mlx-swift-examples")
+            ],
+            linkerSettings: [
+                .linkedLibrary("sqlite3")
             ]
         ),
         .testTarget(

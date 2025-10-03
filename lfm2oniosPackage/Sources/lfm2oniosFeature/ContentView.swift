@@ -368,7 +368,9 @@ struct ChatView: View {
                             if let currentURL = await runtime.currentModelURL {
                                 print("DEBUG: Reloading model after streaming cancellation")
                                 await runtime.unloadModel()
-                                try? await runtime.loadModel(at: currentURL)
+                                if let entry = ModelCatalog.entry(forSlug: selected.slug) {
+                                    try? await runtime.loadModel(entry: entry, at: currentURL)
+                                }
                             }
                         }
                         print("DEBUG: Messages cleared immediately during streaming, model will be reloaded")
@@ -479,7 +481,7 @@ struct ChatView: View {
                 }
                 
                 print("runtime: { event: \"load:attempting\", slug: \"\(selected.slug)\", url: \"\(urlToLoad.path)\", urlExists: \(FileManager.default.fileExists(atPath: urlToLoad.path)) }")
-                try await runtime.loadModel(at: urlToLoad)
+                try await runtime.loadModel(entry: entry, at: urlToLoad)
                 print("runtime: { event: \"load:success\", slug: \"\(selected.slug)\" }")
                 
                 // Initialize conversation manager after successful model load
@@ -538,7 +540,8 @@ struct ChatView: View {
             var tokenCount = 0
             
             do {
-                try await runtime.streamResponse(prompt: prompt) { token in
+                let llmMessages = conversationManager?.getMessagesForLLM() ?? []
+                try await runtime.streamResponse(prompt: prompt, conversation: llmMessages) { token in
                     await MainActor.run {
                         // Check if task was cancelled or messages were cleared
                         guard !Task.isCancelled, assistantIndex < messages.count else {
