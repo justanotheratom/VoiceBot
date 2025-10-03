@@ -84,7 +84,10 @@ final actor GemmaRuntimeAdapter: ModelRuntimeAdapting {
         }
 
         let rolesSummary = conversationForModel.map { $0.role.rawValue }.joined(separator: ",")
-        print("runtime: { event: \"gemma:conversation\", roles: \"\(rolesSummary)\", count: \(conversationForModel.count) }")
+        AppLogger.runtime().log(event: "gemma:conversation", data: [
+            "roles": rolesSummary,
+            "count": conversationForModel.count
+        ])
 
         let generationParameters = makeGenerationParameters(limit: tokenLimit)
         var repetitionGuard = RepetitionGuard(prompt: prompt)
@@ -103,7 +106,11 @@ final actor GemmaRuntimeAdapter: ModelRuntimeAdapting {
 
             if case let .stop(reason, repeats, sample) = decision {
                 let sanitizedSample = sanitizeForLog(sample)
-                print("runtime: { event: \"gemma:repeatGuard\", reason: \"\(reason)\", repeats: \(repeats), sample: \"\(sanitizedSample)\" }")
+                AppLogger.runtime().log(event: "gemma:repeatGuard", data: [
+                    "reason": reason,
+                    "repeats": repeats,
+                    "sample": sanitizedSample
+                ], level: .error)
                 break
             }
         }

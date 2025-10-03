@@ -21,11 +21,11 @@ public struct AppLogger {
         self.logger = os.Logger(subsystem: Self.subsystem, category: category)
     }
     
-    static func app() -> AppLogger { AppLogger(category: Category.app) }
-    static func download() -> AppLogger { AppLogger(category: Category.download) }
-    static func runtime() -> AppLogger { AppLogger(category: Category.runtime) }
-    static func ui() -> AppLogger { AppLogger(category: Category.ui) }
-    static func storage() -> AppLogger { AppLogger(category: Category.storage) }
+    public static func app() -> AppLogger { AppLogger(category: Category.app) }
+    public static func download() -> AppLogger { AppLogger(category: Category.download) }
+    public static func runtime() -> AppLogger { AppLogger(category: Category.runtime) }
+    public static func ui() -> AppLogger { AppLogger(category: Category.ui) }
+    public static func storage() -> AppLogger { AppLogger(category: Category.storage) }
     
     /// Log a structured event with consistent formatting
     /// - Parameters:
@@ -38,9 +38,12 @@ public struct AppLogger {
         
         let message = formatLogMessage(logData)
         logger.log(level: level, "\(message, privacy: .public)")
-        
-        // Also print to console for development/debugging
-        print("\(category): \(message)")
+
+        // Mirror only error-level messages to the console to avoid noisy debug output.
+        let shouldMirrorToConsole = level == .error || level == .fault
+        if shouldMirrorToConsole {
+            print("\(category): \(message)")
+        }
     }
     
     /// Log an error with structured formatting

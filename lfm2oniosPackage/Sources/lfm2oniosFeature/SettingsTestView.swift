@@ -65,14 +65,12 @@ public struct SettingsTestView: View {
     }
     
     private func selectModel(_ slug: String) {
-        print("Selecting model: \(slug)")
         withAnimation(.easeInOut(duration: 0.2)) {
             selectedModelSlug = slug
         }
     }
     
     private func downloadModel(_ slug: String) {
-        print("Starting download: \(slug)")
         downloadStates[slug] = .inProgress(progress: 0.0)
         
         // Simulate download progress
@@ -90,7 +88,6 @@ public struct SettingsTestView: View {
     }
     
     private func deleteModel(_ slug: String) {
-        print("Deleting model: \(slug)")
         withAnimation(.easeInOut(duration: 0.2)) {
             downloadStates[slug] = .notStarted
             // If we're deleting the currently selected model, switch to another
@@ -103,7 +100,6 @@ public struct SettingsTestView: View {
     }
     
     private func cancelDownload(_ slug: String) {
-        print("Canceling download: \(slug)")
         downloadStates[slug] = .notStarted
     }
 }

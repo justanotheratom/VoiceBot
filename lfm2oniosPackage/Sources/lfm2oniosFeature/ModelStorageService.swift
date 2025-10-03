@@ -40,9 +40,7 @@ public struct ModelStorageService: Sendable {
         } else {
             name = "\(entry.slug).bundle"
         }
-        let bundleURL = root.appendingPathComponent(name, isDirectory: false)
-        print("storage: { event: \"expectedBundleURL\", slug: \"\(entry.slug)\", quantization: \"\(entry.quantizationSlug ?? "none")\", name: \"\(name)\", root: \"\(root.path)\", fullPath: \"\(bundleURL.path)\" }")
-        return bundleURL
+        return root.appendingPathComponent(name, isDirectory: false)
     }
 
     public func expectedGemmaDirectoryURL(for entry: ModelCatalogEntry) throws -> URL {
@@ -54,16 +52,12 @@ public struct ModelStorageService: Sendable {
         }
 
         let root = try modelsRootDirectory()
-        let directory = root.appendingPathComponent(metadata.assetIdentifier, isDirectory: true)
-        print("storage: { event: \"expectedGemmaDirectory\", slug: \"\(entry.slug)\", assetIdentifier: \"\(metadata.assetIdentifier)\", root: \"\(root.path)\", fullPath: \"\(directory.path)\" }")
-        return directory
+        return root.appendingPathComponent(metadata.assetIdentifier, isDirectory: true)
     }
 
     public func isDownloaded(entry: ModelCatalogEntry) -> Bool {
         do {
             let url = try expectedResourceURL(for: entry)
-            print("storage: { event: \"isDownloaded:check\", slug: \"\(entry.slug)\", expectedPath: \"\(url.path)\", runtime: \"\(entry.runtime.rawValue)\" }")
-
             switch entry.runtime {
             case .leap:
                 return isLeapBundleDownloaded(at: url)
@@ -71,7 +65,7 @@ public struct ModelStorageService: Sendable {
                 return isGemmaDirectoryReady(at: url, metadata: entry.gemmaMetadata)
             }
         } catch {
-            print("storage: { event: \"isDownloaded:error\", slug: \"\(entry.slug)\", error: \"\(String(describing: error))\" }")
+            AppLogger.storage().logError(event: "checkFailed", error: error, data: ["modelSlug": entry.slug])
             return false
         }
     }
@@ -86,20 +80,20 @@ public struct ModelStorageService: Sendable {
     private func isLeapBundleDownloaded(at url: URL) -> Bool {
         var isDir: ObjCBool = false
         let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-        print("storage: { event: \"isDownloaded:pathCheck\", exists: \(exists), isDirectory: \(isDir.boolValue) }")
 
         guard exists else {
-            print("storage: { event: \"isDownloaded:result\", result: false, reason: \"notExists\" }")
             return false
         }
 
         if isDir.boolValue {
             if let contents = try? FileManager.default.contentsOfDirectory(atPath: url.path) {
                 let hasFiles = !contents.isEmpty
-                print("storage: { event: \"isDownloaded:contentsCheck\", fileCount: \(contents.count), hasFiles: \(hasFiles) }")
                 return hasFiles
             } else {
-                print("storage: { event: \"isDownloaded:result\", result: false, reason: \"cannotReadDirContents\" }")
+                AppLogger.storage().log(event: "contentsReadFailed", data: [
+                    "path": url,
+                    "reason": "cannotReadDirContents"
+                ], level: .error)
                 return false
             }
         } else {
@@ -107,10 +101,9 @@ public struct ModelStorageService: Sendable {
                 let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
                 let fileSize = attrs[.size] as? Int64 ?? 0
                 let isValid = fileSize > 1024
-                print("storage: { event: \"isDownloaded:fileCheck\", fileSize: \(fileSize), isValid: \(isValid) }")
                 return isValid
             } catch {
-                print("storage: { event: \"isDownloaded:result\", result: false, reason: \"cannotReadFileAttrs\", error: \"\(error.localizedDescription)\" }")
+                AppLogger.storage().logError(event: "attributeReadFailed", error: error, data: ["path": url])
                 return false
             }
         }
@@ -119,25 +112,26 @@ public struct ModelStorageService: Sendable {
     private func isGemmaDirectoryReady(at url: URL, metadata: ModelCatalogEntry.GemmaMetadata?) -> Bool {
         var isDir: ObjCBool = false
         let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-        print("storage: { event: \"isDownloaded:gemmaPathCheck\", exists: \(exists), isDirectory: \(isDir.boolValue) }")
 
         guard exists, isDir.boolValue else {
-            print("storage: { event: \"isDownloaded:result\", result: false, reason: \"missingDirectory\" }")
             return false
         }
 
         guard let metadata else {
-            print("storage: { event: \"isDownloaded:result\", result: false, reason: \"missingMetadata\" }")
+            AppLogger.storage().log(event: "missingMetadata", data: [
+                "path": url
+            ], level: .error)
             return false
         }
 
         let primaryPath = url.appendingPathComponent(metadata.primaryFilePath)
         if !FileManager.default.fileExists(atPath: primaryPath.path) {
-            print("storage: { event: \"isDownloaded:result\", result: false, reason: \"primaryFileMissing\", primaryFile: \"\(primaryPath.path)\" }")
+            AppLogger.storage().log(event: "primaryFileMissing", data: [
+                "path": primaryPath
+            ], level: .error)
             return false
         }
 
         return true
     }
 }
-

@@ -29,9 +29,9 @@ actor GemmaInferenceService {
     }
 
     func preloadModel() async throws {
-        print("runtime: { event: \"gemma:preload:start\" }")
+        AppLogger.runtime().log(event: "gemma:preload:start")
         _ = try await loadContainer()
-        print("runtime: { event: \"gemma:preload:ready\" }")
+        AppLogger.runtime().log(event: "gemma:preload:ready")
     }
 
     func tokenStream(
@@ -52,7 +52,7 @@ actor GemmaInferenceService {
         var generationParameters = parameters
         if let maxTokens {
             generationParameters.maxTokens = maxTokens
-            print("runtime: { event: \"gemma:maxTokens\", value: \(maxTokens) }")
+            AppLogger.runtime().log(event: "gemma:maxTokens", data: ["value": maxTokens])
         }
         let chatMessages = conversation.map { message -> Chat.Message in
             let role: Chat.Message.Role

@@ -35,7 +35,10 @@ public actor ModelRuntimeService {
         }
 
         guard let currentAdapter = adapter else {
-            print("runtime: { event: \"preload:error\", slug: \"\(entry.slug)\", reason: \"adapterMissing\" }")
+            AppLogger.runtime().log(event: "preload:error", data: [
+                "slug": entry.slug,
+                "reason": "adapterMissing"
+            ], level: .error)
             throw ModelRuntimeError.notLoaded
         }
 
@@ -43,12 +46,12 @@ public actor ModelRuntimeService {
         loadedURL = url
         currentEntryID = entry.id
 
-        print("runtime: { event: \"preload:start\", slug: \"\(entry.slug)\" }")
+        AppLogger.runtime().log(event: "preload:start", data: ["slug": entry.slug])
         do {
             try await currentAdapter.preload()
-            print("runtime: { event: \"preload:complete\", slug: \"\(entry.slug)\" }")
+            AppLogger.runtime().log(event: "preload:complete", data: ["slug": entry.slug])
         } catch {
-            print("runtime: { event: \"preload:failed\", slug: \"\(entry.slug)\", error: \"\(error.localizedDescription)\" }")
+            AppLogger.runtime().logError(event: "preload:failed", error: error, data: ["slug": entry.slug])
             throw error
         }
     }
@@ -80,7 +83,7 @@ public actor ModelRuntimeService {
         onToken: @Sendable @escaping (String) async -> Void
     ) async throws {
         guard let adapter else {
-            print("runtime: { event: \"stream:error\", reason: \"noModelLoaded\" }")
+            AppLogger.runtime().log(event: "stream:error", data: ["reason": "noModelLoaded"], level: .error)
             throw ModelRuntimeError.notLoaded
         }
 

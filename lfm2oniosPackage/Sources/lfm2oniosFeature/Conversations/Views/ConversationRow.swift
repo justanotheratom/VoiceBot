@@ -64,7 +64,6 @@ struct ConversationRow: View {
     
     return List {
         ConversationRow(conversation: sampleConversation) {
-            print("Delete tapped")
         }
     }
     .listStyle(.plain)

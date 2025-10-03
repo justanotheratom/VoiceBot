@@ -22,21 +22,18 @@ public struct ContentView: View {
                         previousSelected = current
                         persistence.clearSelectedModel()
                         selected = nil
-                        print("ui: { event: \"switchModel\" }")
                     }, onSelectModel: { model in
                         selected = model
-                        print("ui: { event: \"modelSelected\", modelSlug: \"\(model.slug)\" }")
                     }, onDeleteModel: { entry in
                         do {
                             try storage.deleteDownloadedModel(entry: entry)
-                            print("download: { event: \"deleted\", modelSlug: \"\(entry.slug)\" }")
                             if let current = selected, current.slug == entry.slug {
                                 // Clear selection if we deleted the active model
                                 persistence.clearSelectedModel()
                                 selected = nil
                             }
                         } catch {
-                            print("download: { event: \"deleteFailed\", error: \"\(String(describing: error))\" }")
+                            AppLogger.download().logError(event: "deleteFailed", error: error, data: ["modelSlug": entry.slug])
                         }
                     }, persistence: persistence)
                 } else {
@@ -53,25 +50,22 @@ public struct ContentView: View {
                         )
                         persistence.saveSelectedModel(model)
                         selected = model
-                        print("ui: { event: \"select:completed\", modelSlug: \"\(entry.slug)\" }")
                     } onDelete: { entry in
                         do {
                             try storage.deleteDownloadedModel(entry: entry)
-                            print("download: { event: \"deleted\", modelSlug: \"\(entry.slug)\" }")
                             if let current = selected, current.slug == entry.slug {
                                 // Clear selection if we deleted the active model
                                 persistence.clearSelectedModel()
                                 selected = nil
                             }
                         } catch {
-                            print("download: { event: \"deleteFailed\", error: \"\(String(describing: error))\" }")
+                            AppLogger.download().logError(event: "deleteFailed", error: error, data: ["modelSlug": entry.slug])
                         }
                     } onCancel: {
                         if let prev = previousSelected {
                             selected = prev
                             persistence.saveSelectedModel(prev)
                             previousSelected = nil
-                            print("ui: { event: \"select:cancelled\" }")
                         }
                     }
                 }
@@ -377,8 +371,6 @@ struct ChatView: View {
             }
             ToolbarItem(placement: .topBarLeading) {
                 Button(action: { 
-                    print("DEBUG: + button tapped, clearing \(messages.count) messages")
-                    
                     if isStreaming {
                         // Clear messages immediately for instant visual feedback
                         messages.removeAll()
@@ -387,20 +379,17 @@ struct ChatView: View {
                         // Fully reload the model to ensure clean state after cancellation
                         Task {
                             if let currentURL = await runtime.currentModelURL {
-                                print("DEBUG: Reloading model after streaming cancellation")
                                 await runtime.unloadModel()
                                 if let entry = ModelCatalog.entry(forSlug: selected.slug) {
                                     try? await runtime.loadModel(entry: entry, at: currentURL)
                                 }
                             }
                         }
-                        print("DEBUG: Messages cleared immediately during streaming, model will be reloaded")
                     } else {
                         // If not streaming, clear immediately as before
                         messages.removeAll()
-                        print("DEBUG: Messages cleared immediately, now \(messages.count) messages")
                     }
-                    
+
                     // Start a new conversation
                     conversationManager?.startNewConversation(modelSlug: selected.slug)
                 }) {
@@ -434,7 +423,6 @@ struct ChatView: View {
                         )
                         persistence.saveSelectedModel(model)
                         onSelectModel(model)
-                        print("ui: { event: \"settings:modelSelected\", modelSlug: \"\(entry.slug)\" }")
                     },
                     onDeleteModel: onDeleteModel,
                     persistence: persistence
@@ -460,56 +448,55 @@ struct ChatView: View {
             ConversationListView { conversation in
                 loadConversation(conversation)
                 showingConversationHistory = false
-                print("ui: { event: \"conversationSelected\", id: \"\(conversation.id)\", title: \"\(conversation.title)\" }")
             }
         }
         .task(id: selected.slug) {
             // Load the model when selection changes
-            print("ui: { event: \"task:modelLoad\", slug: \"\(selected.slug)\", selectedLocalURL: \"\(selected.localURL?.path ?? "nil")\" }")
-            
             do {
-                print("ui: { event: \"task:initialURL\", selectedLocalURL: \"\(selected.localURL?.path ?? "nil")\" }")
-                
                 guard let entry = ModelCatalog.entry(forSlug: selected.slug) else {
-                    print("ui: { event: \"task:noCatalogEntry\", slug: \"\(selected.slug)\" }")
+                    AppLogger.ui().log(event: "task:noCatalogEntry", data: ["slug": selected.slug], level: .error)
                     messages.append(Message(role: .assistant, text: "⚠️ No catalog entry found for \(selected.slug). Please select a different model."))
                     return
                 }
-                
-                print("ui: { event: \"task:foundCatalogEntry\", slug: \"\(selected.slug)\", quantization: \"\(entry.quantizationSlug ?? "none")\" }")
                 let isDownloaded = storage.isDownloaded(entry: entry)
-                print("ui: { event: \"task:downloadCheck\", isDownloaded: \(isDownloaded) }")
-                
+
                 let urlToLoad: URL
                 if isDownloaded {
                     // Always use the current expected URL for downloaded models to avoid container UUID mismatches
                     do {
                         urlToLoad = try storage.expectedResourceURL(for: entry)
-                        print("ui: { event: \"task:usingExpectedURL\", url: \"\(urlToLoad.path)\" }")
                     } catch {
-                        print("ui: { event: \"task:expectedURLFailed\", error: \"\(String(describing: error))\" }")
+                        AppLogger.storage().logError(event: "expectedURLFailed", error: error, data: [
+                            "modelSlug": entry.slug
+                        ])
                         messages.append(Message(role: .assistant, text: "⚠️ Failed to locate model files for \(selected.slug). Please try downloading the model again."))
                         return
                     }
                 } else if let persistedURL = selected.localURL {
                     // Use the persisted URL only if the model is not showing as downloaded
-                    print("ui: { event: \"task:usingPersistedURL\", url: \"\(persistedURL.path)\" }")
                     urlToLoad = persistedURL
                 } else {
-                    print("runtime: { event: \"load:failed\", error: \"noURL\", slug: \"\(selected.slug)\", isDownloaded: false, selectedLocalURL: \"nil\" }")
+                    AppLogger.runtime().log(event: "load:failed", data: [
+                        "slug": selected.slug,
+                        "reason": "missingURL"
+                    ], level: .error)
                     messages.append(Message(role: .assistant, text: "⚠️ Model \(selected.slug) is not downloaded. Please download it first."))
                     return
                 }
-                
-                print("runtime: { event: \"load:attempting\", slug: \"\(selected.slug)\", url: \"\(urlToLoad.path)\", urlExists: \(FileManager.default.fileExists(atPath: urlToLoad.path)) }")
+
+                AppLogger.runtime().log(event: "load:attempting", data: [
+                    "slug": selected.slug,
+                    "url": urlToLoad.path,
+                    "urlExists": FileManager.default.fileExists(atPath: urlToLoad.path)
+                ])
                 try await runtime.loadModel(entry: entry, at: urlToLoad)
-                print("runtime: { event: \"load:success\", slug: \"\(selected.slug)\" }")
-                
+                AppLogger.runtime().log(event: "load:success", data: ["slug": selected.slug])
+
                 // Initialize conversation manager after successful model load
                 conversationManager = ConversationManager(modelRuntimeService: runtime)
                 conversationManager?.startNewConversation(modelSlug: selected.slug)
             } catch {
-                print("runtime: { event: \"load:failed\", slug: \"\(selected.slug)\", error: \"\(String(describing: error))\", errorType: \"\(type(of: error))\" }")
+                AppLogger.runtime().logError(event: "load:failed", error: error, data: ["slug": selected.slug])
                 // Show error to user - no fallback to simulation
                 messages.append(Message(role: .assistant, text: "⚠️ Failed to load model: \(error.localizedDescription)"))
             }
@@ -530,7 +517,6 @@ struct ChatView: View {
     private func stopStreaming(userInitiated: Bool) {
         if userInitiated {
             userRequestedStop = true
-            print("runtime: { event: \"stream:stopRequested\" }")
         } else {
             userRequestedStop = false
         }
@@ -572,7 +558,10 @@ struct ChatView: View {
 
         // Store and cancel any previous streaming task
         let tokenBudget = contextManager.responseTokenBudget(for: selected.slug)
-        print("runtime: { event: \"stream:start\", modelSlug: \"\(selected.slug)\", tokenLimit: \(tokenBudget) }")
+        AppLogger.runtime().log(event: "stream:start", data: [
+            "modelSlug": selected.slug,
+            "tokenLimit": tokenBudget
+        ])
 
         streamingTask = Task { @MainActor in
             let startTime = Date()
@@ -623,11 +612,8 @@ struct ChatView: View {
                 Task { @MainActor in
                     await conversationManager?.addAssistantMessage(assistantResponse)
                 }
-                
-                print("runtime: { event: \"stream:userComplete\", prompt: \"\(prompt.prefix(50))...\", tokens: \(tokenCount), ttft: \(timeToFirstToken ?? 0), tps: \(tokensPerSecond ?? 0) }")
                 userRequestedStop = false
             } catch is CancellationError {
-                print("runtime: { event: \"stream:cancelled\" }")
                 if assistantIndex < messages.count {
                     let partialResponse = messages[assistantIndex].text
                     if !partialResponse.isEmpty, userRequestedStop {
@@ -638,7 +624,7 @@ struct ChatView: View {
                 }
                 userRequestedStop = false
             } catch {
-                print("runtime: { event: \"stream:failed\", error: \"\(String(describing: error))\" }")
+                AppLogger.runtime().logError(event: "stream:failed", error: error)
                 // Only update if messages still exist and index is valid
                 if assistantIndex < messages.count {
                     messages[assistantIndex].text = "❌ Error generating response: \(error.localizedDescription)\n\nPlease ensure the model is properly downloaded and loaded."
@@ -672,8 +658,6 @@ struct ChatView: View {
                 return nil
             }
         }
-        
-        print("ui: { event: \"conversationLoaded\", id: \"\(conversation.id)\", messageCount: \(messages.count) }")
     }
 }
 

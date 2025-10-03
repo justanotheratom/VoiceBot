@@ -7,7 +7,9 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
 
     func loadModel(at url: URL, entry: ModelCatalogEntry) async throws {
         if currentURL == url, modelRunner != nil {
-            print("runtime: { event: \"leap:load:skipped\", reason: \"alreadyLoaded\" }")
+            AppLogger.runtime().log(event: "leap:load:skipped", data: [
+                "reason": "alreadyLoaded"
+            ])
             return
         }
 
@@ -17,9 +19,13 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
             let runner = try await Leap.load(url: url)
             modelRunner = runner
             currentURL = url
-            print("runtime: { event: \"leap:load:success\", slug: \"\(entry.slug)\" }")
+            AppLogger.runtime().log(event: "leap:load:success", data: [
+                "slug": entry.slug
+            ])
         } catch {
-            print("runtime: { event: \"leap:load:failed\", error: \"\(error.localizedDescription)\" }")
+            AppLogger.runtime().logError(event: "leap:load:failed", error: error, data: [
+                "slug": entry.slug
+            ])
             throw ModelRuntimeError.underlying(error.localizedDescription)
         }
     }
@@ -58,7 +64,10 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
                     await onToken(text)
                     generatedTokenEstimate += Self.estimateTokenCount(for: text)
                     if generatedTokenEstimate >= tokenLimit {
-                        print("runtime: { event: \"leap:tokenLimitReached\", limit: \(tokenLimit), estimatedTokens: \(generatedTokenEstimate) }")
+                        AppLogger.runtime().log(event: "leap:tokenLimitReached", data: [
+                            "limit": tokenLimit,
+                            "estimatedTokens": generatedTokenEstimate
+                        ])
                         return
                     }
                 case .reasoningChunk(_), .functionCall(_):

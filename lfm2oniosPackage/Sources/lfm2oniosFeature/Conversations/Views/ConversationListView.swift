@@ -111,7 +111,6 @@ struct ConversationListView: View {
 #if DEBUG
 #Preview {
     ConversationListView { conversation in
-        print("Selected conversation: \(conversation.title)")
     }
 }
 #endif

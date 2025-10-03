@@ -4,13 +4,13 @@ import lfm2oniosFeature
 @main
 struct lfm2oniosApp: App {
     init() {
-        print("app: { event: \"launch\", build: \"1.0 (1)\" }")
+        AppLogger.logAppLaunch(build: "1.0 (1)")
         // Handle automation flags as early as possible so ContentView sees persisted state
         let args = ProcessInfo.processInfo.arguments
         if args.contains("--ui-test-clean-reset") {
             let persistence = PersistenceService()
             persistence.clearSelectedModel()
-            print("app: { event: \"cleanReset:init\" }")
+            AppLogger.app().log(event: "cleanReset:init")
         }
         if let idx = args.firstIndex(of: "--ui-test-autoselect") {
             let slug = args.indices.contains(idx + 1) ? args[idx + 1] : "lfm2-350m"
@@ -30,9 +30,9 @@ struct lfm2oniosApp: App {
                     )
                     let persistence = PersistenceService()
                     persistence.saveSelectedModel(model)
-                    print("app: { event: \"autoSelect:init\", modelSlug: \"\(entry.slug)\" }")
+                    AppLogger.app().log(event: "autoSelect:init", data: ["modelSlug": entry.slug])
                 } catch {
-                    print("app: { event: \"autoSelect:initFailed\", error: \"\(String(describing: error))\" }")
+                    AppLogger.app().logError(event: "autoSelect:initFailed", error: error)
                 }
             }
         }
@@ -41,12 +41,12 @@ struct lfm2oniosApp: App {
         WindowGroup {
             ContentView()
                 .onAppear {
-                    print("ui: { event: \"rootAppear\" }")
+                    AppLogger.ui().log(event: "rootAppear")
                     // Optional clean reset for automated runs
                     if ProcessInfo.processInfo.arguments.contains("--ui-test-clean-reset") {
                         let persistence = PersistenceService()
                         persistence.clearSelectedModel()
-                        print("app: { event: \"cleanReset\" }")
+                        AppLogger.app().log(event: "cleanReset")
                     }
 
                     // Optional auto-select for automated runs: --ui-test-autoselect <slug>
@@ -70,9 +70,9 @@ struct lfm2oniosApp: App {
                                 )
                                 let persistence = PersistenceService()
                                 persistence.saveSelectedModel(model)
-                                print("app: { event: \"autoSelect\", modelSlug: \"\(entry.slug)\" }")
+                                AppLogger.app().log(event: "autoSelect", data: ["modelSlug": entry.slug])
                             } catch {
-                                print("app: { event: \"autoSelectFailed\", error: \"\(String(describing: error))\" }")
+                                AppLogger.app().logError(event: "autoSelectFailed", error: error)
                             }
                         }
                     }

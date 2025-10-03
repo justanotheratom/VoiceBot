@@ -17,7 +17,10 @@ struct LeapModelDownloadAdapter: RuntimeModelDownloadAdapting {
     ) async throws -> URL {
         guard let urlString = entry.downloadURLString,
               let filename = extractFilename(from: urlString) else {
-            print("download: { event: \"failed\", error: \"invalidURL\", url: \"\(entry.downloadURLString ?? "nil")\" }")
+            AppLogger.download().log(event: "failed", data: [
+                "reason": "invalidURL",
+                "url": entry.downloadURLString ?? "nil"
+            ], level: .error)
             throw ModelDownloadError.invalidURL
         }
         let hfModel = HuggingFaceDownloadableModel(
@@ -42,7 +45,7 @@ struct LeapModelDownloadAdapter: RuntimeModelDownloadAdapting {
 
             return expectedURL
         } catch {
-            print("download: { event: \"failed\", modelSlug: \"\(entry.slug)\", error: \"\(String(describing: error))\" }")
+            AppLogger.download().logError(event: "failed", error: error, data: ["modelSlug": entry.slug])
             throw ModelDownloadError.underlying("LeapModelDownloader failed: \(error.localizedDescription)")
         }
     }
@@ -130,7 +133,7 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
         do {
             hub = try hubProvider()
         } catch is GemmaHubClient.Error {
-            print("download: { event: \"gemma:missingToken\" }")
+            AppLogger.download().log(event: "gemma:missingToken", level: .error)
             throw ModelDownloadError.missingToken
         }
 
@@ -151,10 +154,14 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
             }
         } catch {
             let message = error.localizedDescription
-            print("download: { event: \"gemma:snapshotFailed\", error: \"\(message)\" }")
+            AppLogger.download().log(event: "gemma:snapshotFailed", data: [
+                "error": message
+            ], level: .error)
 
             if message.contains("Offline mode error") || message.contains("Repository not available locally") {
-                print("download: { event: \"gemma:directFallback\", repo: \"\(metadata.repoID)\" }")
+                AppLogger.download().log(event: "gemma:directFallback", data: [
+                    "repo": metadata.repoID
+                ])
                 snapshotURL = try await downloadGemmaFilesDirectly(
                     metadata: metadata,
                     destinationDirectory: destinationDirectory,
@@ -179,14 +186,19 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
                 try promoteSnapshot(from: snapshotURL, to: destinationDirectory)
                 try flattenPrivateDirectoryIfNeeded(at: destinationDirectory)
             } catch {
-                print("download: { event: \"gemma:promoteFailed\", error: \"\(error.localizedDescription)\" }")
+                AppLogger.download().log(event: "gemma:promoteFailed", data: [
+                    "error": error.localizedDescription
+                ], level: .error)
                 throw ModelDownloadError.underlying("Failed to prepare Gemma assets: \(error.localizedDescription)")
             }
         }
 
         let primaryFile = destinationDirectory.appendingPathComponent(metadata.primaryFilePath)
         if !fileManager.fileExists(atPath: primaryFile.path) {
-            print("download: { event: \"gemma:primaryMissing\", slug: \"\(entry.slug)\", expected: \"\(primaryFile.path)\" }")
+            AppLogger.download().log(event: "gemma:primaryMissing", data: [
+                "slug": entry.slug,
+                "expected": primaryFile.path
+            ], level: .error)
             throw ModelDownloadError.underlying("Gemma primary file missing after download")
         }
 

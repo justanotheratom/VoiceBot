@@ -83,7 +83,6 @@ public struct ModelSelectionView: View {
                             tasks[entry.id]?.cancel()
                             tasks[entry.id] = nil
                             downloading[entry.id] = nil
-                            print("download: { event: \"cancelled\", modelSlug: \"\(entry.slug)\" }")
                         } label: {
                             Image(systemName: "xmark.circle")
                                 .imageScale(.medium)
@@ -126,9 +125,8 @@ public struct ModelSelectionView: View {
                     do {
                         let url = try storage.expectedResourceURL(for: entry)
                         onComplete(entry, url)
-                        print("ui: { event: \"select\", modelSlug: \"\(entry.slug)\" }")
                     } catch {
-                        print("ui: { event: \"selectFailed\", error: \"\(String(describing: error))\" }")
+                        AppLogger.ui().logError(event: "selectFailed", error: error, data: ["modelSlug": entry.slug])
                     }
                 }
             }
@@ -172,11 +170,10 @@ public struct ModelSelectionView: View {
                 downloading[entry.id] = nil
                 downloadedSet.insert(entry.id)
                 onComplete(entry, result.localURL)
-                print("download: { event: \"complete:inline\", modelSlug: \"\(entry.slug)\" }")
             } catch {
                 downloading[entry.id] = nil
                 if Task.isCancelled == false {
-                    print("download: { event: \"failed\", error: \"\(String(describing: error))\" }")
+                    AppLogger.download().logError(event: "failed", error: error, data: ["modelSlug": entry.slug])
                 }
             }
         }
