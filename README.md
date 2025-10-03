@@ -10,6 +10,7 @@ This template includes **opinionated rules files** for popular AI coding assista
 - **Claude Code**: `CLAUDE.md` - Claude Code rules
 - **Cursor**: `.cursor/*.mdc` - Cursor-specific rules
 - **GitHub Copilot**: `.github/copilot-instructions.md` - GitHub Copilot rules
+- **Repository Guidelines**: `AGENTS.md` - Contributor workflow and coding standards
 
 ### Customization Options
 These rules files are **starting points** - feel free to:
