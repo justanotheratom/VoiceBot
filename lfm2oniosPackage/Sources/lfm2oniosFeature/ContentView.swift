@@ -238,6 +238,7 @@ struct ChatView: View {
             .padding(.vertical, 16)
             .background {
                 inputBarBackground
+                .ignoresSafeArea(edges: .bottom)
             }
         }
     }
