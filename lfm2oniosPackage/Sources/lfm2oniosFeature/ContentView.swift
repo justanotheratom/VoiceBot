@@ -362,6 +362,7 @@ struct ChatView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                     }
+                    .scrollIndicators(.hidden)
                     .scrollDismissesKeyboard(.interactively)
                 }
                 .tag(pairIndex)
@@ -430,7 +431,7 @@ struct ChatView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 14)
+            .padding(.top, 14)
             .background {
                 inputBarBackground
                     .ignoresSafeArea(edges: .bottom)
