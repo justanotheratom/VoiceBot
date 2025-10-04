@@ -459,29 +459,29 @@ struct ChatView: View {
                 finishRecordingFromUser()
             }
 
-        HStack(spacing: 14) {
+        HStack(spacing: 10) {
             // Icon with elegant styling
             ZStack {
                 Circle()
                     .fill(microphoneBackgroundColor.gradient)
-                    .frame(width: 52, height: 52)
-                    .shadow(color: microphoneBackgroundColor.opacity(0.3), radius: 8, y: 4)
+                    .frame(width: 40, height: 40)
+                    .shadow(color: microphoneBackgroundColor.opacity(0.3), radius: 6, y: 3)
 
                 microphoneIcon
-                    .font(.system(size: 24, weight: .medium))
+                    .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(.white)
                     .symbolEffect(.pulse, options: .repeating, isActive: microphoneStatus == .recording)
             }
 
             // Text content with better typography
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(microphonePrimaryText)
-                    .font(.body.weight(.medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(microphonePrimaryColor)
 
                 if let detail = microphoneDetailText {
                     Text(detail)
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -491,23 +491,23 @@ struct ChatView: View {
             // Progress indicator
             if microphoneShowsProgress {
                 ProgressView()
-                    .controlSize(.regular)
+                    .controlSize(.small)
                     .tint(microphoneBackgroundColor)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .background {
-            RoundedRectangle(cornerRadius: 28)
+            RoundedRectangle(cornerRadius: 22)
                 .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+                .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 28)
+            RoundedRectangle(cornerRadius: 22)
                 .strokeBorder(.quaternary, lineWidth: 0.5)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 28))
+        .contentShape(RoundedRectangle(cornerRadius: 22))
         .scaleEffect(microphoneStatus == .recording ? 1.02 : 1.0)
         .opacity(microphoneIsEnabled ? 1.0 : 0.5)
         .gesture(gesture)
@@ -689,11 +689,11 @@ struct ChatView: View {
             ZStack {
                 Circle()
                     .fill(.red.gradient)
-                    .frame(width: 52, height: 52)
-                    .shadow(color: .red.opacity(0.3), radius: 8, y: 4)
+                    .frame(width: 40, height: 40)
+                    .shadow(color: .red.opacity(0.3), radius: 6, y: 3)
 
                 Image(systemName: "stop.fill")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
             }
         }
