@@ -201,7 +201,7 @@ struct ChatView: View {
     }
 
 #if os(iOS)
-    private func requestRecordPermissionIfNeeded() async {
+    nonisolated private func requestRecordPermissionIfNeeded() async {
         let permission = AVAudioApplication.shared.recordPermission
 
         switch permission {
