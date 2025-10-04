@@ -404,12 +404,15 @@ func gemmaConfigNormalizerFlattensIntermediateSize() throws {
     let indexURL = tempDirectory.appendingPathComponent("model.safetensors.index.json")
     let indexPayload: [String: Any] = [
         "metadata": [
-            "total_parameters": 2,
-            "total_size": 8
+            "total_parameters": 5,
+            "total_size": 20
         ],
         "weight_map": [
             "foo.weight": "model-00001-of-00003.safetensors",
-            "bar.weight": "model-00002-of-00003.safetensors"
+            "bar.weight": "model-00002-of-00003.safetensors",
+            "language_model.model.embed_tokens.weight": "model-00001-of-00003.safetensors",
+            "language_model.model.norm.weight": "model-00002-of-00003.safetensors",
+            "language_model.model.altup_unembed_projections.0.weight": "model-00003-of-00003.safetensors"
         ]
     ]
     let indexData = try JSONSerialization.data(withJSONObject: indexPayload, options: [.prettyPrinted])
@@ -426,6 +429,21 @@ func gemmaConfigNormalizerFlattensIntermediateSize() throws {
             "dtype": "F32",
             "shape": [1],
             "data_offsets": [4, 8]
+        ],
+        "language_model.model.embed_tokens.weight": [
+            "dtype": "F32",
+            "shape": [1],
+            "data_offsets": [8, 12]
+        ],
+        "language_model.model.norm.weight": [
+            "dtype": "F32",
+            "shape": [1],
+            "data_offsets": [12, 16]
+        ],
+        "language_model.model.altup_unembed_projections.0.weight": [
+            "dtype": "F32",
+            "shape": [1],
+            "data_offsets": [16, 20]
         ]
     ]
 
@@ -454,6 +472,37 @@ func gemmaConfigNormalizerFlattensIntermediateSize() throws {
 
     #expect(weightMap?["foo.weight"] == "model.safetensors")
     #expect(weightMap?["bar.weight"] == "model.safetensors")
+    #expect(weightMap?["language_model.model.embed_tokens.weight"] == "model.safetensors")
+    #expect(weightMap?["language_model.embed_tokens.weight"] == "model.safetensors")
+    #expect(weightMap?["language_model.norm.weight"] == "model.safetensors")
+    #expect(weightMap?["language_model.altup_unembed_projections.0.weight"] == "model.safetensors")
+
+    let handle = try FileHandle(forReadingFrom: aggregateURL)
+    defer {
+        if #available(iOS 15.0, macOS 12.0, *) {
+            try? handle.close()
+        } else {
+            handle.closeFile()
+        }
+    }
+
+    guard let headerSizeData = try handle.read(upToCount: 8), headerSizeData.count == 8 else {
+        #expect(Bool(false), "Failed to read safetensor header size")
+        return
+    }
+    let headerSize = headerSizeData.withUnsafeBytes { ptr -> UInt64 in
+        let value = ptr.load(as: UInt64.self)
+        return UInt64(littleEndian: value)
+    }
+    guard let headerData = try handle.read(upToCount: Int(headerSize)), headerData.count == headerSize else {
+        #expect(Bool(false), "Failed to read safetensor header body")
+        return
+    }
+    let headerJSON = try JSONSerialization.jsonObject(with: headerData) as? [String: Any]
+    #expect(headerJSON?["language_model.model.embed_tokens.weight"] != nil)
+    #expect(headerJSON?["language_model.embed_tokens.weight"] != nil)
+    #expect(headerJSON?["language_model.norm.weight"] != nil)
+    #expect(headerJSON?["language_model.altup_unembed_projections.0.weight"] != nil)
 }
 
 @Test("TitleGenerationService fallback title generation")

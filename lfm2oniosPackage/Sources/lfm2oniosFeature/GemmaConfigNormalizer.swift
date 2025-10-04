@@ -4,6 +4,7 @@ struct GemmaConfigNormalizer {
     static func normalizeIfNeeded(in directory: URL) {
         normalizeConfig(in: directory)
         normalizeIndex(in: directory)
+        normalizeModelShard(in: directory)
     }
 
     private static func normalizeConfig(in directory: URL) {
@@ -83,6 +84,12 @@ struct GemmaConfigNormalizer {
                         weightMap[name] = aggregateFilename
                         updated = true
                     }
+
+                    let sanitized = sanitizeTensorName(name)
+                    if weightMap[sanitized] != aggregateFilename {
+                        weightMap[sanitized] = aggregateFilename
+                        updated = true
+                    }
                 }
             }
 
@@ -131,5 +138,95 @@ struct GemmaConfigNormalizer {
         }
 
         return json.keys.filter { $0 != "__metadata__" }
+    }
+
+    private static func sanitizeTensorName(_ name: String) -> String {
+        if name.hasPrefix("language_model.model.") {
+            return "language_model." + name.dropFirst("language_model.model.".count)
+        }
+        return name
+    }
+
+    private static func normalizeModelShard(in directory: URL) {
+        let modelURL = directory.appendingPathComponent("model.safetensors", isDirectory: false)
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: modelURL.path) else { return }
+
+        do {
+            let sourceHandle = try FileHandle(forReadingFrom: modelURL)
+            defer {
+                if #available(iOS 15.0, macOS 12.0, *) {
+                    try? sourceHandle.close()
+                } else {
+                    sourceHandle.closeFile()
+                }
+            }
+
+            guard let headerSizeData = try sourceHandle.read(upToCount: 8), headerSizeData.count == 8 else { return }
+            let headerSize = headerSizeData.withUnsafeBytes { ptr -> UInt64 in
+                let value = ptr.load(as: UInt64.self)
+                return UInt64(littleEndian: value)
+            }
+
+            guard let headerData = try sourceHandle.read(upToCount: Int(headerSize)), headerData.count == headerSize else { return }
+            guard var headerJSON = try JSONSerialization.jsonObject(with: headerData) as? [String: Any] else { return }
+
+            var updated = false
+            for key in Array(headerJSON.keys) {
+                let sanitized = sanitizeTensorName(key)
+                if sanitized != key, headerJSON[sanitized] == nil {
+                    headerJSON[sanitized] = headerJSON[key]
+                    updated = true
+                }
+            }
+
+            guard updated else { return }
+
+            let newHeaderData = try JSONSerialization.data(withJSONObject: headerJSON, options: [])
+            var newHeaderSizeLE = UInt64(newHeaderData.count).littleEndian
+
+            let tempURL = directory.appendingPathComponent("model.safetensors.tmp", isDirectory: false)
+            if fm.fileExists(atPath: tempURL.path) {
+                try fm.removeItem(at: tempURL)
+            }
+            fm.createFile(atPath: tempURL.path, contents: nil)
+
+            guard let destinationHandle = try? FileHandle(forWritingTo: tempURL) else { return }
+            defer {
+                if #available(iOS 15.0, macOS 12.0, *) {
+                    try? destinationHandle.close()
+                } else {
+                    destinationHandle.closeFile()
+                }
+            }
+
+            withUnsafeBytes(of: &newHeaderSizeLE) { destinationHandle.write(Data($0)) }
+            destinationHandle.write(newHeaderData)
+
+            let bodyOffset = 8 + headerSize
+            try sourceHandle.seek(toOffset: bodyOffset)
+
+            while true {
+                let chunk = try sourceHandle.read(upToCount: 8 * 1024 * 1024)
+                if let chunk, !chunk.isEmpty {
+                    destinationHandle.write(chunk)
+                } else {
+                    break
+                }
+            }
+
+            if #available(iOS 13.0, *) {
+                try destinationHandle.synchronize()
+            }
+
+            try fm.removeItem(at: modelURL)
+            try fm.moveItem(at: tempURL, to: modelURL)
+            AppLogger.download().log(event: "gemma:modelNormalized", data: ["path": modelURL.lastPathComponent])
+        } catch {
+            AppLogger.download().log(event: "gemma:modelNormalizationFailed", data: [
+                "error": error.localizedDescription,
+                "path": modelURL.lastPathComponent
+            ], level: .error)
+        }
     }
 }
