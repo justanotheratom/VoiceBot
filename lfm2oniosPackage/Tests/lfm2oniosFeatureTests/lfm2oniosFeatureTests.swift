@@ -391,7 +391,8 @@ func gemmaConfigNormalizerFlattensIntermediateSize() throws {
     let payload: [String: Any] = [
         "text_config": [
             "intermediate_size": [8192, 8192, 8192],
-            "hidden_size": 2048
+            "hidden_size": 2048,
+            "head_dim": 256
         ]
     ]
     let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted])
@@ -403,8 +404,10 @@ func gemmaConfigNormalizerFlattensIntermediateSize() throws {
     let decoded = try JSONSerialization.jsonObject(with: normalizedData) as? [String: Any]
     let textConfig = decoded?["text_config"] as? [String: Any]
     let intermediateSize = textConfig?["intermediate_size"] as? Int
+    let queryPreAttnScalar = textConfig?["query_pre_attn_scalar"] as? Float ?? (textConfig?["query_pre_attn_scalar"] as? NSNumber)?.floatValue
 
     #expect(intermediateSize == 8192)
+    #expect(queryPreAttnScalar == 256)
 }
 
 @Test("TitleGenerationService fallback title generation")

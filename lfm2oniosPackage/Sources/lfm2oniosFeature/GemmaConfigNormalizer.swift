@@ -18,6 +18,13 @@ struct GemmaConfigNormalizer {
                     root["text_config"] = textConfig
                     updated = true
                 }
+
+                if textConfig["query_pre_attn_scalar"] == nil,
+                   let headDim = textConfig["head_dim"] as? NSNumber {
+                    textConfig["query_pre_attn_scalar"] = headDim.floatValue
+                    root["text_config"] = textConfig
+                    updated = true
+                }
             }
 
             guard updated else { return }
