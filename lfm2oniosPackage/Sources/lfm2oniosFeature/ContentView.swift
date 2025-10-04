@@ -219,13 +219,19 @@ struct ChatView: View {
             return
         }
 
-        isRequestingRecordPermission = true
-        let granted = await withCheckedContinuation { continuation in
-            AVAudioApplication.requestRecordPermission { granted in
-                continuation.resume(returning: granted)
+        await MainActor.run {
+            isRequestingRecordPermission = true
+        }
+        let granted = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            Task { @MainActor in
+                AVAudioApplication.requestRecordPermission { granted in
+                    continuation.resume(returning: granted)
+                }
             }
         }
-        isRequestingRecordPermission = false
+        await MainActor.run {
+            isRequestingRecordPermission = false
+        }
         recordPermission = granted ? .granted : .denied
         microphoneErrorMessage = granted ? nil : "Enable microphone access in Settings."
         AppLogger.ui().log(event: "mic:recordPermission", data: ["status": granted ? "granted" : "denied"])
