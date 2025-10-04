@@ -1183,12 +1183,6 @@ struct ChatView: View {
     }
 
     private func stopStreaming(userInitiated: Bool) {
-        AppLogger.runtime().log(event: "stream:stop", data: [
-            "userInitiated": userInitiated,
-            "wasStreaming": isStreaming,
-            "hasTask": streamingTask != nil
-        ])
-
         userRequestedStop = userInitiated
 
         // Cancel the task but don't nil it out - let it finish cleanup naturally
@@ -1199,34 +1193,21 @@ struct ChatView: View {
 
         // Don't set isStreaming here - let the task cleanup handle it
         // to avoid race conditions
-        AppLogger.runtime().log(event: "stream:stopComplete", data: [:])
     }
 
     private func sendTranscript(_ rawPrompt: String) {
         let prompt = rawPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty else { return }
 
-        AppLogger.runtime().log(event: "sendTranscript:start", data: [
-            "promptLength": prompt.count,
-            "currentlyStreaming": isStreaming,
-            "messageCount": messages.count,
-            "hasStreamingTask": streamingTask != nil
-        ])
-
         // CRITICAL: Cancel and wait for previous streaming task to fully complete
         // before starting a new one to avoid race conditions
         if let existingTask = streamingTask {
-            AppLogger.runtime().log(event: "sendTranscript:waitingForPreviousTask", data: [
-                "taskIsCancelled": existingTask.isCancelled
-            ])
             existingTask.cancel()
 
             // Start the new message in a task that waits for cleanup
             Task { @MainActor in
-                AppLogger.runtime().log(event: "sendTranscript:beforeAwait", data: [:])
                 // Wait for the old task to finish its cleanup
                 await existingTask.value
-                AppLogger.runtime().log(event: "sendTranscript:previousTaskComplete", data: [:])
 
                 // Now safe to proceed
                 startNewMessage(prompt: prompt)
@@ -1234,16 +1215,10 @@ struct ChatView: View {
             return
         }
 
-        AppLogger.runtime().log(event: "sendTranscript:noExistingTask", data: [:])
         startNewMessage(prompt: prompt)
     }
 
     private func startNewMessage(prompt: String) {
-        AppLogger.runtime().log(event: "startNewMessage:begin", data: [
-            "isStreaming": isStreaming,
-            "hasTask": streamingTask != nil
-        ])
-
         withAnimation(.easeInOut(duration: 0.2)) {
             messages.append(Message(role: .user, text: prompt))
             messages.append(Message(role: .assistant, text: ""))
@@ -1254,11 +1229,6 @@ struct ChatView: View {
 
         let assistantIndex = messages.count - 1
         isStreaming = true
-
-        AppLogger.runtime().log(event: "startNewMessage:beforeStream", data: [
-            "assistantIndex": assistantIndex,
-            "isStreaming": isStreaming
-        ])
 
         // Start smooth scroll timer during streaming
         scrollTimer?.invalidate()
@@ -1272,26 +1242,14 @@ struct ChatView: View {
 
         // Store and cancel any previous streaming task
         let tokenBudget = contextManager.responseTokenBudget(for: selected.slug)
-        AppLogger.runtime().log(event: "stream:start", data: [
-            "modelSlug": selected.slug,
-            "tokenLimit": tokenBudget
-        ])
 
         streamingTask = Task { @MainActor in
             let startTime = Date()
             var firstTokenTime: Date?
             var tokenCount = 0
 
-            AppLogger.runtime().log(event: "streamingTask:created", data: [
-                "assistantIndex": assistantIndex
-            ])
-
             do {
                 let llmMessages = conversationManager?.getMessagesForLLM() ?? []
-                AppLogger.runtime().log(event: "streamingTask:beforeRuntimeCall", data: [
-                    "conversationLength": llmMessages.count,
-                    "tokenBudget": tokenBudget
-                ])
 
                 try await runtime.streamResponse(
                     prompt: prompt,
@@ -1301,26 +1259,16 @@ struct ChatView: View {
                     await MainActor.run {
                         // Check if task was cancelled or messages were cleared
                         guard !Task.isCancelled, assistantIndex < messages.count else {
-                            AppLogger.runtime().log(event: "streamingTask:tokenSkipped", data: [
-                                "cancelled": Task.isCancelled,
-                                "indexValid": assistantIndex < messages.count
-                            ])
                             return
                         }
 
                         if firstTokenTime == nil {
                             firstTokenTime = Date()
-                            AppLogger.runtime().log(event: "streamingTask:firstToken", data: [:])
                         }
                         tokenCount += 1
                         messages[assistantIndex].text += token
                     }
                 }
-
-                AppLogger.runtime().log(event: "streamingTask:streamComplete", data: [
-                    "tokenCount": tokenCount,
-                    "cancelled": Task.isCancelled
-                ])
 
                 // Check if task was cancelled before updating stats
                 if !Task.isCancelled, assistantIndex < messages.count {
@@ -1343,21 +1291,8 @@ struct ChatView: View {
                         await conversationManager?.addAssistantMessage(assistantResponse)
                     }
                     userRequestedStop = false
-
-                    AppLogger.runtime().log(event: "streamingTask:success", data: [
-                        "tokenCount": tokenCount
-                    ])
-                } else {
-                    AppLogger.runtime().log(event: "streamingTask:skipStats", data: [
-                        "cancelled": Task.isCancelled,
-                        "indexValid": assistantIndex < messages.count
-                    ])
                 }
             } catch is CancellationError {
-                AppLogger.runtime().log(event: "streamingTask:cancelled", data: [
-                    "userInitiated": userRequestedStop,
-                    "tokensReceived": tokenCount
-                ])
 
                 if assistantIndex < messages.count {
                     let partialResponse = messages[assistantIndex].text
@@ -1378,16 +1313,10 @@ struct ChatView: View {
 
             // CRITICAL: Always reset streaming state, even if task was cancelled early
             // This must run regardless of early returns above
-            AppLogger.runtime().log(event: "streamingTask:cleanup", data: [
-                "isStreamingBefore": isStreaming
-            ])
             scrollTimer?.invalidate()
             scrollTimer = nil
             isStreaming = false
             streamingTask = nil
-            AppLogger.runtime().log(event: "streamingTask:cleanupComplete", data: [
-                "isStreamingAfter": isStreaming
-            ])
         }
     }
     

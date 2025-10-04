@@ -9,22 +9,12 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
 
     func loadModel(at url: URL, entry: ModelCatalogEntry) async throws {
         if currentURL == url, modelRunner != nil, !conversationWasCancelled {
-            AppLogger.runtime().log(event: "leap:load:skipped", data: [
-                "reason": "alreadyLoaded"
-            ])
             return
         }
 
         try validateModel(at: url)
 
         do {
-            // If reloading after cancellation, log it
-            if conversationWasCancelled {
-                AppLogger.runtime().log(event: "leap:reloadAfterCancel", data: [
-                    "url": url.path
-                ])
-            }
-
             let runner = try await Leap.load(url: url)
             modelRunner = runner
             currentURL = url
@@ -63,14 +53,8 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
                 throw ModelRuntimeError.notLoaded
             }
 
-            AppLogger.runtime().log(event: "leap:reloadingAfterCancel", data: [
-                "url": url.path
-            ])
-
             // Force reload to reset internal Leap SDK state
             try await loadModel(at: url, entry: entry)
-
-            AppLogger.runtime().log(event: "leap:reloadAfterCancelComplete", data: [:])
         }
 
         guard let runner = modelRunner else {
@@ -94,10 +78,6 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
                     await onToken(text)
                     generatedTokenEstimate += Self.estimateTokenCount(for: text)
                     if generatedTokenEstimate >= tokenLimit {
-                        AppLogger.runtime().log(event: "leap:tokenLimitReached", data: [
-                            "limit": tokenLimit,
-                            "estimatedTokens": generatedTokenEstimate
-                        ])
                         return
                     }
                 case .reasoningChunk(_), .functionCall(_):
@@ -109,7 +89,6 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
                 }
             }
         } catch is CancellationError {
-            AppLogger.runtime().log(event: "leap:streamCancelled:error", data: [:])
             wasStreamCancelled = true
             throw CancellationError()
         } catch {
@@ -118,9 +97,6 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
 
         // Check if task was cancelled even if no error was thrown
         if Task.isCancelled {
-            AppLogger.runtime().log(event: "leap:streamCancelled:taskCheck", data: [
-                "tokensGenerated": generatedTokenEstimate
-            ])
             wasStreamCancelled = true
         }
 

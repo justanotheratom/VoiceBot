@@ -65,11 +65,7 @@ public actor ModelRuntimeService {
     }
 
     public func resetConversation() async {
-        AppLogger.runtime().log(event: "service:resetConversation:called", data: [
-            "hasAdapter": adapter != nil
-        ])
         await adapter?.resetConversation()
-        AppLogger.runtime().log(event: "service:resetConversation:complete", data: [:])
     }
 
     public var isModelLoaded: Bool {
@@ -86,18 +82,10 @@ public actor ModelRuntimeService {
         tokenLimit: Int,
         onToken: @Sendable @escaping (String) async -> Void
     ) async throws {
-        AppLogger.runtime().log(event: "service:streamResponse:called", data: [
-            "hasAdapter": adapter != nil,
-            "conversationLength": conversation.count,
-            "tokenLimit": tokenLimit
-        ])
-
         guard let adapter else {
             AppLogger.runtime().log(event: "stream:error", data: ["reason": "noModelLoaded"], level: .error)
             throw ModelRuntimeError.notLoaded
         }
-
-        AppLogger.runtime().log(event: "service:streamResponse:delegatingToAdapter", data: [:])
 
         try await adapter.streamResponse(
             prompt: prompt,
@@ -105,7 +93,5 @@ public actor ModelRuntimeService {
             tokenLimit: tokenLimit,
             onToken: onToken
         )
-
-        AppLogger.runtime().log(event: "service:streamResponse:adapterCompleted", data: [:])
     }
 }
