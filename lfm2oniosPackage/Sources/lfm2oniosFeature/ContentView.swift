@@ -317,13 +317,14 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
+                    // Only show the latest user-assistant pair
+                    ForEach(Array(latestMessagePair.enumerated()), id: \.element.id) { index, msg in
                         VStack(spacing: 12) {
                             ChatMessageView(message: msg, isStreaming: isStreaming && msg.id == messages.last?.id)
                                 .accessibilityIdentifier("message_\(msg.id.uuidString)")
-                            
+
                             // Add separator after user messages (before assistant response)
-                            if msg.role == .user && index < messages.count - 1 {
+                            if msg.role == .user && index < latestMessagePair.count - 1 {
                                 Divider()
                             }
                         }
@@ -337,14 +338,14 @@ struct ChatView: View {
             .onChange(of: messages.count) { _, _ in
                 // Scroll to bottom when new message is added
                 withAnimation(.easeInOut(duration: 0.3)) {
-                    if let lastMessage = messages.last {
+                    if let lastMessage = latestMessagePair.last {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
                     }
                 }
             }
             .onChange(of: shouldScrollToBottom) { _, shouldScroll in
                 // Scroll to bottom during streaming with smooth spring animation
-                if shouldScroll, let lastMessage = messages.last {
+                if shouldScroll, let lastMessage = latestMessagePair.last {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
                     }
@@ -353,45 +354,300 @@ struct ChatView: View {
             }
         }
     }
+
+    private var latestMessagePair: [Message] {
+        // Find the last user message and its corresponding assistant response
+        guard !messages.isEmpty else { return [] }
+
+        // Get the last two messages if they form a user-assistant pair
+        if messages.count >= 2 {
+            let lastTwo = Array(messages.suffix(2))
+            if lastTwo[0].role == .user && lastTwo[1].role == .assistant {
+                return lastTwo
+            }
+        }
+
+        // If only one message or not a proper pair, return the last message
+        return [messages.last!]
+    }
     
     @ViewBuilder
     private var inputBarView: some View {
         VStack(spacing: 0) {
-            // Subtle top border
-            Rectangle()
-                .fill(.separator.opacity(0.3))
-                .frame(height: 0.5)
-            
-            VStack(spacing: 12) {
-                HStack(alignment: .center, spacing: 12) {
-                    MicrophoneInputBar(
-                        status: microphoneStatus,
-                        isEnabled: microphoneIsEnabled
-                    ) {
-                        startRecordingFromUser()
-                    } onPressEnded: {
-                        finishRecordingFromUser()
-                    }
+            // Subtle top divider
+            Divider()
+                .opacity(0.5)
 
-                    if isStreaming {
-                        stopButton
-                    }
-                }
+            HStack(spacing: 16) {
+                // Compact microphone button with state-aware design
+                microphoneButton
 
-                if let feedback = microphoneFeedback {
-                    Text(feedback.text)
-                        .font(.footnote)
-                        .foregroundStyle(feedback.color)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                // Stop button (replaces mic during streaming)
+                if isStreaming {
+                    stopButton
+                        .transition(.scale.combined(with: .opacity))
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
             .background {
                 inputBarBackground
-                .ignoresSafeArea(edges: .bottom)
+                    .ignoresSafeArea(edges: .bottom)
             }
+            .overlay(alignment: .top) {
+                // Status banner that overlays above input bar
+                if let feedback = microphoneFeedback {
+                    statusBanner(text: feedback.text, color: feedback.color)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var microphoneButton: some View {
+        let gesture = DragGesture(minimumDistance: 0)
+            .onChanged { _ in
+                guard microphoneIsEnabled, microphoneStatus.allowsInteraction else { return }
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                #endif
+                startRecordingFromUser()
+            }
+            .onEnded { _ in
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                finishRecordingFromUser()
+            }
+
+        HStack(spacing: 12) {
+            // Icon with pulsing animation during recording
+            microphoneIcon
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(microphoneIconColor)
+                .frame(width: 44, height: 44)
+                .background {
+                    Circle()
+                        .fill(microphoneBackgroundColor)
+                }
+                .overlay {
+                    if case .recording = microphoneStatus {
+                        Circle()
+                            .stroke(Color.red.opacity(0.5), lineWidth: 2)
+                            .scaleEffect(1.2)
+                            .opacity(0.8)
+                            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: microphoneStatus)
+                    }
+                }
+
+            // Compact text - single line with dynamic content
+            VStack(alignment: .leading, spacing: 2) {
+                Text(microphonePrimaryText)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(microphonePrimaryColor)
+
+                if let detail = microphoneDetailText {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            // Progress indicator for permission/transcription states
+            if microphoneShowsProgress {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(.blue)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background {
+            microphoneContainerBackground
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 24))
+        .opacity(microphoneIsEnabled ? 1.0 : 0.6)
+        .gesture(gesture)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: microphoneStatus)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(microphoneAccessibilityLabel)
+        .accessibilityHint(microphoneAccessibilityHint)
+        .accessibilityAddTraits(.isButton)
+    }
+
+    @ViewBuilder
+    private func statusBanner(text: String, color: Color) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(color)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(color.opacity(0.3), lineWidth: 1)
+                    }
+            }
+            .offset(y: -8)
+            .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+    }
+
+    // MARK: - Microphone Button Helpers
+
+    private var microphoneIcon: Image {
+        switch microphoneStatus {
+        case .idle:
+            return Image(systemName: "mic.fill")
+        case .requestingPermission:
+            return Image(systemName: "exclamationmark.circle.fill")
+        case .recording:
+            return Image(systemName: "waveform")
+        case .transcribing:
+            return Image(systemName: "arrow.triangle.2.circlepath")
+        case .disabled:
+            return Image(systemName: "mic.slash.fill")
+        case .error:
+            return Image(systemName: "exclamationmark.triangle.fill")
+        }
+    }
+
+    private var microphoneIconColor: Color {
+        switch microphoneStatus {
+        case .idle:
+            return .white
+        case .requestingPermission:
+            return .white
+        case .recording:
+            return .white
+        case .transcribing:
+            return .white
+        case .disabled:
+            return .white.opacity(0.6)
+        case .error:
+            return .white
+        }
+    }
+
+    private var microphoneBackgroundColor: Color {
+        switch microphoneStatus {
+        case .idle:
+            return .blue
+        case .requestingPermission:
+            return .blue
+        case .recording:
+            return .red
+        case .transcribing:
+            return .blue
+        case .disabled:
+            return .gray
+        case .error:
+            return .orange
+        }
+    }
+
+    private var microphonePrimaryColor: Color {
+        switch microphoneStatus {
+        case .idle, .requestingPermission, .transcribing:
+            return .primary
+        case .recording:
+            return .red
+        case .disabled:
+            return .secondary
+        case .error:
+            return .orange
+        }
+    }
+
+    private var microphonePrimaryText: String {
+        switch microphoneStatus {
+        case .idle:
+            return "Tap & hold to speak"
+        case .requestingPermission:
+            return "Requesting access…"
+        case .recording:
+            return "Recording…"
+        case .transcribing:
+            return "Processing speech…"
+        case .disabled:
+            return "Microphone unavailable"
+        case .error:
+            return "Error occurred"
+        }
+    }
+
+    private var microphoneDetailText: String? {
+        switch microphoneStatus {
+        case .idle:
+            return nil // Removed redundant detail text
+        case .requestingPermission:
+            return "Grant permissions to continue"
+        case .recording:
+            return "Release to send"
+        case .transcribing:
+            return nil
+        case .disabled(let message):
+            return message.isEmpty ? nil : message
+        case .error(let message):
+            return message.isEmpty ? nil : message
+        }
+    }
+
+    private var microphoneShowsProgress: Bool {
+        switch microphoneStatus {
+        case .requestingPermission, .transcribing:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var microphoneContainerBackground: some View {
+        RoundedRectangle(cornerRadius: 24)
+            .fill(.ultraThickMaterial)
+            .overlay {
+                RoundedRectangle(cornerRadius: 24)
+                    .strokeBorder(.separator.opacity(0.5), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
+    }
+
+    private var microphoneAccessibilityLabel: String {
+        switch microphoneStatus {
+        case .idle:
+            return "Microphone button. Tap and hold to record your message."
+        case .requestingPermission:
+            return "Requesting microphone permission."
+        case .recording:
+            return "Recording in progress. Release to send."
+        case .transcribing:
+            return "Transcribing your speech."
+        case .disabled:
+            return "Microphone unavailable."
+        case .error:
+            return "Microphone error. Tap and hold to retry."
+        }
+    }
+
+    private var microphoneAccessibilityHint: String {
+        switch microphoneStatus {
+        case .idle:
+            return "Double tap and hold to record, release to send your voice message."
+        case .recording:
+            return "Release to send your voice message."
+        case .requestingPermission:
+            return "Grant microphone permissions in Settings."
+        case .transcribing:
+            return "Please wait while processing completes."
+        case .disabled:
+            return "Enable microphone in Settings to use voice input."
+        case .error:
+            return "Tap and hold again to retry."
         }
     }
     
@@ -414,10 +670,10 @@ struct ChatView: View {
     @ViewBuilder
     private var inputBarBackground: some View {
         Rectangle()
-            .fill(.regularMaterial)
+            .fill(.thinMaterial)
             .background {
                 LinearGradient(
-                    colors: [.clear, .black.opacity(0.02)],
+                    colors: [.clear, .black.opacity(0.03)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -715,6 +971,9 @@ struct ChatView: View {
                 if duration < 0.5 {
                     recordingStartTime = nil
                     microphoneErrorMessage = "Hold the microphone a bit longer."
+                    #if os(iOS)
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    #endif
                     AppLogger.ui().log(event: "mic:record:tooShort", data: ["durationMs": elapsedMs ?? 0])
                     return
                 }
@@ -727,11 +986,17 @@ struct ChatView: View {
             let cleaned = transcript?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !cleaned.isEmpty else {
                 microphoneErrorMessage = "I didn't catch that. Try speaking again."
+                #if os(iOS)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                #endif
                 AppLogger.ui().log(event: "mic:record:empty", data: [:])
                 return
             }
 
             microphoneErrorMessage = nil
+            #if os(iOS)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            #endif
             AppLogger.ui().log(event: "mic:record:transcript", data: [
                 "characters": cleaned.count,
                 "durationMs": elapsedMs ?? -1
@@ -756,6 +1021,10 @@ struct ChatView: View {
 
     private func handleSpeechRecognitionError(_ error: Error) async {
         recordingStartTime = nil
+        #if os(iOS)
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        #endif
+
         if let serviceError = error as? SpeechRecognitionService.ServiceError {
             switch serviceError {
             case .authorizationDenied:
