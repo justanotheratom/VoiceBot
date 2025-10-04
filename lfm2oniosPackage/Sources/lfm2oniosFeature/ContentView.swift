@@ -335,57 +335,41 @@ struct ChatView: View {
     
     @ViewBuilder
     private var messagesView: some View {
-        ZStack(alignment: .top) {
-            TabView(selection: $currentPairIndex) {
-                ForEach(Array(messagePairs.enumerated()), id: \.offset) { pairIndex, pair in
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(Array(pair.enumerated()), id: \.element.id) { index, msg in
-                                VStack(spacing: 12) {
-                                    ChatMessageView(message: msg, isStreaming: isStreaming && msg.id == messages.last?.id)
-                                        .accessibilityIdentifier("message_\(msg.id.uuidString)")
+        TabView(selection: $currentPairIndex) {
+            ForEach(Array(messagePairs.enumerated()), id: \.offset) { pairIndex, pair in
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        ForEach(Array(pair.enumerated()), id: \.element.id) { index, msg in
+                            VStack(spacing: 12) {
+                                ChatMessageView(message: msg, isStreaming: isStreaming && msg.id == messages.last?.id)
+                                    .accessibilityIdentifier("message_\(msg.id.uuidString)")
 
-                                    // Add separator after user messages (before assistant response)
-                                    if msg.role == .user && index < pair.count - 1 {
-                                        Divider()
-                                    }
+                                // Add separator after user messages (before assistant response)
+                                if msg.role == .user && index < pair.count - 1 {
+                                    Divider()
                                 }
-                                .id(msg.id)
                             }
+                            .id(msg.id)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
                     }
-                    .scrollDismissesKeyboard(.interactively)
-                    .tag(pairIndex)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
+                .scrollDismissesKeyboard(.interactively)
+                .tag(pairIndex)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .onChange(of: messages.count) { _, _ in
-                // Jump to latest pair when new message is added
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    currentPairIndex = messagePairs.count - 1
-                }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .animation(.smooth(duration: 0.4), value: currentPairIndex)
+        .onChange(of: messages.count) { oldCount, newCount in
+            // Smooth transition to latest pair when new message is added
+            withAnimation(.smooth(duration: 0.4)) {
+                currentPairIndex = messagePairs.count - 1
             }
-            .onAppear {
-                // Start at the latest pair
-                currentPairIndex = max(0, messagePairs.count - 1)
-            }
-
-            // Page indicator
-            if messagePairs.count > 1 {
-                HStack(spacing: 6) {
-                    ForEach(0..<messagePairs.count, id: \.self) { index in
-                        Circle()
-                            .fill(index == currentPairIndex ? Color.primary : Color.secondary.opacity(0.3))
-                            .frame(width: 6, height: 6)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.ultraThinMaterial, in: Capsule())
-                .padding(.top, 8)
-            }
+        }
+        .onAppear {
+            // Start at the latest pair
+            currentPairIndex = max(0, messagePairs.count - 1)
         }
     }
 
