@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "lfm2oniosFeature",
     platforms: [
-        .iOS(.v17),
+        .iOS(.v18),
         .macOS(.v14)
     ],
     products: [
@@ -39,7 +39,9 @@ let package = Package(
                 .product(name: "MLXLLM", package: "mlx-swift-examples")
             ],
             linkerSettings: [
-                .linkedLibrary("sqlite3")
+                .linkedLibrary("sqlite3"),
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("Speech")
             ]
         ),
         .testTarget(

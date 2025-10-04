@@ -4,6 +4,8 @@
 <dict>
 	<!-- Base entitlements - add your app's entitlements here -->
 	<!-- AI agents can safely modify this file to add capabilities -->
+	<!-- On-device speech recognition does not require additional entitlements.
+	     Leave this file unchanged unless enabling cloud speech or other capabilities. -->
 	
 	<!-- Example entitlements (commented out by default):
 	

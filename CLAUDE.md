@@ -1,481 +1,74 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Project Overview
 
-This is a native **iOS application** built with **Swift 6.1+** and **SwiftUI**. The codebase targets **iOS 18.0 and later**, allowing full use of modern Swift and iOS APIs. All concurrency is handled with **Swift Concurrency** (async/await, actors, @MainActor isolation) ensuring thread-safe code.
+**lfm2onios** is a native iOS application (iOS 18.0+) that runs on-device LLM inference using Liquid AI's Leap SDK and MLX Swift. The app supports both LFM2 models (via Leap SDK) and Gemma models (via MLX Swift), with a chat interface featuring streaming responses, model management, and speech-to-text input.
 
-- **Frameworks & Tech:** SwiftUI for UI, Swift Concurrency with strict mode, Swift Package Manager for modular architecture
-- **Architecture:** Model-View (MV) pattern using pure SwiftUI state management. We avoid MVVM and instead leverage SwiftUI's built-in state mechanisms (@State, @Observable, @Environment, @Binding)
-- **Testing:** Swift Testing framework with modern @Test macros and #expect/#require assertions
-- **Platform:** iOS (Simulator and Device)
-- **Accessibility:** Full accessibility support using SwiftUI's accessibility modifiers
+- **Tech Stack:** Swift 6.1+, SwiftUI, Swift Concurrency (async/await, actors)
+- **Architecture:** Model-View (MV) pattern with native SwiftUI state management (@State, @Observable, @Environment)
+- **LLM Engines:** Leap SDK for LFM2 models, MLX Swift for Gemma models
+- **Testing:** Swift Testing framework with @Test macros
+- **Project Structure:** Workspace + SPM package architecture
 
-## Project Structure
+## Key Features
 
-The project follows a **workspace + SPM package** architecture:
+- **Multi-Model Support:** LFM2 (350M, 700M, 1.2B) and Gemma (2B, 2.6B) models
+- **On-Demand Downloads:** Models downloaded as needed with progress tracking
+- **Streaming Chat:** Token-by-token streaming responses with typing indicators
+- **Speech Input:** Real-time speech-to-text via iOS Speech framework
+- **Model Management:** Settings UI for downloading, switching, and deleting models
+- **Conversation History:** Persisted chat sessions with SwiftData
+
+# Project Architecture
 
 ```
-YourApp/
-├── Config/                         # XCConfig build settings
-│   ├── Debug.xcconfig
-│   ├── Release.xcconfig
-│   ├── Shared.xcconfig
-│   └── Tests.xcconfig
-├── YourApp.xcworkspace/            # Workspace container
-├── YourApp.xcodeproj/              # App shell (minimal wrapper)
-├── YourApp/                        # App target - just the entry point
-│   ├── Assets.xcassets/
-│   ├── YourAppApp.swift           # @main entry point only
-│   └── YourApp.xctestplan
-├── YourAppPackage/                 # All features and business logic
-│   ├── Package.swift
-│   ├── Sources/
-│   │   └── YourAppFeature/        # Feature modules
-│   └── Tests/
-│       └── YourAppFeatureTests/   # Swift Testing tests
-└── YourAppUITests/                 # UI automation tests
+lfm2onios/
+├── lfm2onios.xcworkspace/              # Open this in Xcode
+├── lfm2onios.xcodeproj/                # App shell (minimal)
+├── lfm2onios/                          # App target entry point
+│   └── lfm2oniosApp.swift              # @main app lifecycle
+├── lfm2oniosPackage/                   # 🚀 All development happens here
+│   ├── Package.swift                   # Dependencies (LeapSDK, MLX, etc.)
+│   ├── Sources/lfm2oniosFeature/       # Feature code
+│   │   ├── ContentView.swift           # Root view & chat UI
+│   │   ├── ModelCatalog.swift          # Model metadata
+│   │   ├── *Service.swift              # Core business logic
+│   │   ├── *RuntimeAdapter.swift       # LLM engine adapters
+│   │   ├── MicrophoneInputBar.swift    # Speech input UI
+│   │   ├── Conversations/              # Chat history models
+│   │   └── ...
+│   └── Tests/lfm2oniosFeatureTests/    # Unit tests
+├── Config/                              # Build settings
+│   ├── Shared.xcconfig                 # Bundle ID, versions
+│   └── lfm2onios.entitlements          # Speech, microphone permissions
+└── docs/                                # Design docs, PRD
 ```
 
-**Important:** All development work should be done in the **YourAppPackage** Swift Package, not in the app project. The app project is merely a thin wrapper that imports and launches the package features.
+**Important:** All feature development happens in `lfm2oniosPackage/Sources/lfm2oniosFeature/`. The app target only imports and displays the package.
 
-# Code Quality & Style Guidelines
+# Common Development Commands
 
-## Swift Style & Conventions
+## Building and Running
 
-- **Naming:** Use `UpperCamelCase` for types, `lowerCamelCase` for properties/functions. Choose descriptive names (e.g., `calculateMonthlyRevenue()` not `calcRev`)
-- **Value Types:** Prefer `struct` for models and data, use `class` only when reference semantics are required
-- **Enums:** Leverage Swift's powerful enums with associated values for state representation
-- **Early Returns:** Prefer early return pattern over nested conditionals to avoid pyramid of doom
-
-## Optionals & Error Handling
-
-- Use optionals with `if let`/`guard let` for nil handling
-- Never force-unwrap (`!`) without absolute certainty - prefer `guard` with failure path
-- Use `do/try/catch` for error handling with meaningful error types
-- Handle or propagate all errors - no empty catch blocks
-
-# Modern SwiftUI Architecture Guidelines (2025)
-
-### No ViewModels - Use Native SwiftUI Data Flow
-**New features MUST follow these patterns:**
-
-1. **Views as Pure State Expressions**
-   ```swift
-   struct MyView: View {
-       @Environment(MyService.self) private var service
-       @State private var viewState: ViewState = .loading
-       
-       enum ViewState {
-           case loading
-           case loaded(data: [Item])
-           case error(String)
-       }
-       
-       var body: some View {
-           // View is just a representation of its state
-       }
-   }
-   ```
-
-2. **Use Environment Appropriately**
-   - **App-wide services**: Router, Theme, CurrentAccount, Client, etc. - use `@Environment`
-   - **Feature-specific services**: Timeline services, single-view logic - use `let` properties with `@Observable`
-   - Rule: Environment for cross-app/cross-feature dependencies, let properties for single-feature services
-   - Access app-wide via `@Environment(ServiceType.self)`
-   - Feature services: `private let myService = MyObservableService()`
-
-3. **Local State Management**
-   - Use `@State` for view-specific state
-   - Use `enum` for view states (loading, loaded, error)
-   - Use `.task(id:)` and `.onChange(of:)` for side effects
-   - Pass state between views using `@Binding`
-
-4. **No ViewModels Required**
-   - Views should be lightweight and disposable
-   - Business logic belongs in services/clients
-   - Test services independently, not views
-   - Use SwiftUI previews for visual testing
-
-5. **When Views Get Complex**
-   - Split into smaller subviews
-   - Use compound views that compose smaller views
-   - Pass state via bindings between views
-   - Never reach for a ViewModel as the solution
-
-# iOS 26 Features (Optional)
-
-**Note**: If your app targets iOS 26+, you can take advantage of these cutting-edge SwiftUI APIs introduced in June 2025. These features are optional and should only be used when your deployment target supports iOS 26.
-
-## Available iOS 26 SwiftUI APIs
-
-When targeting iOS 26+, consider using these new APIs:
-
-#### Liquid Glass Effects
-- `glassEffect(_:in:isEnabled:)` - Apply Liquid Glass effects to views
-- `buttonStyle(.glass)` - Apply Liquid Glass styling to buttons
-- `ToolbarSpacer` - Create visual breaks in toolbars with Liquid Glass
-
-#### Enhanced Scrolling
-- `scrollEdgeEffectStyle(_:for:)` - Configure scroll edge effects
-- `backgroundExtensionEffect()` - Duplicate, mirror, and blur views around edges
-
-#### Tab Bar Enhancements
-- `tabBarMinimizeBehavior(_:)` - Control tab bar minimization behavior
-- Search role for tabs with search field replacing tab bar
-- `TabViewBottomAccessoryPlacement` - Adjust accessory view content based on placement
-
-#### Web Integration
-- `WebView` and `WebPage` - Full control over browsing experience
-
-#### Drag and Drop
-- `draggable(_:_:)` - Drag multiple items
-- `dragContainer(for:id:in:selection:_:)` - Container for draggable views
-
-#### Animation
-- `@Animatable` macro - SwiftUI synthesizes custom animatable data properties
-
-#### UI Components
-- `Slider` with automatic tick marks when using step parameter
-- `windowResizeAnchor(_:)` - Set window anchor point for resizing
-
-#### Text Enhancements
-- `TextEditor` now supports `AttributedString`
-- `AttributedTextSelection` - Handle text selection with attributed text
-- `AttributedTextFormattingDefinition` - Define text styling in specific contexts
-- `FindContext` - Create find navigator in text editing views
-
-#### Accessibility
-- `AssistiveAccess` - Support Assistive Access in iOS scenes
-
-#### HDR Support
-- `Color.ResolvedHDR` - RGBA values with HDR headroom information
-
-#### UIKit Integration
-- `UIHostingSceneDelegate` - Host and present SwiftUI scenes in UIKit
-- `NSGestureRecognizerRepresentable` - Incorporate gesture recognizers from AppKit
-
-#### Immersive Spaces (if applicable)
-- `manipulable(coordinateSpace:operations:inertia:isEnabled:onChanged:)` - Hand gesture manipulation
-- `SurfaceSnappingInfo` - Snap volumes and windows to surfaces
-- `RemoteImmersiveSpace` - Render stereo content from Mac to Apple Vision Pro
-- `SpatialContainer` - 3D layout container
-- Depth-based modifiers: `aspectRatio3D(_:contentMode:)`, `rotation3DLayout(_:)`, `depthAlignment(_:)`
-
-## iOS 26 Usage Guidelines
-- **Only use when targeting iOS 26+**: Ensure your deployment target supports these APIs
-- **Progressive enhancement**: Use availability checks if supporting multiple iOS versions
-- **Feature detection**: Test on older simulators to ensure graceful fallbacks
-- **Modern aesthetics**: Leverage Liquid Glass effects for cutting-edge UI design
-
-```swift
-// Example: Using iOS 26 features with availability checks
-struct ModernButton: View {
-    var body: some View {
-        Button("Tap me") {
-            // Action
-        }
-        .buttonStyle({
-            if #available(iOS 26.0, *) {
-                .glass
-            } else {
-                .bordered
-            }
-        }())
-    }
-}
-```
-
-## SwiftUI State Management (MV Pattern)
-
-- **@State:** For all state management, including observable model objects
-- **@Observable:** Modern macro for making model classes observable (replaces ObservableObject)
-- **@Environment:** For dependency injection and shared app state
-- **@Binding:** For two-way data flow between parent and child views
-- **@Bindable:** For creating bindings to @Observable objects
-- Avoid ViewModels - put view logic directly in SwiftUI views using these state mechanisms
-- Keep views focused and extract reusable components
-
-Example with @Observable:
-```swift
-@Observable
-class UserSettings {
-    var theme: Theme = .light
-    var fontSize: Double = 16.0
-}
-
-@MainActor
-struct SettingsView: View {
-    @State private var settings = UserSettings()
-    
-    var body: some View {
-        VStack {
-            // Direct property access, no $ prefix needed
-            Text("Font Size: \(settings.fontSize)")
-            
-            // For bindings, use @Bindable
-            @Bindable var settings = settings
-            Slider(value: $settings.fontSize, in: 10...30)
-        }
-    }
-}
-
-// Sharing state across views
-@MainActor
-struct ContentView: View {
-    @State private var userSettings = UserSettings()
-    
-    var body: some View {
-        NavigationStack {
-            MainView()
-                .environment(userSettings)
-        }
-    }
-}
-
-@MainActor
-struct MainView: View {
-    @Environment(UserSettings.self) private var settings
-    
-    var body: some View {
-        Text("Current theme: \(settings.theme)")
-    }
-}
-```
-
-Example with .task modifier for async operations:
-```swift
-@Observable
-class DataModel {
-    var items: [Item] = []
-    var isLoading = false
-    
-    func loadData() async throws {
-        isLoading = true
-        defer { isLoading = false }
-        
-        // Simulated network call
-        try await Task.sleep(for: .seconds(1))
-        items = try await fetchItems()
-    }
-}
-
-@MainActor
-struct ItemListView: View {
-    @State private var model = DataModel()
-    
-    var body: some View {
-        List(model.items) { item in
-            Text(item.name)
-        }
-        .overlay {
-            if model.isLoading {
-                ProgressView()
-            }
-        }
-        .task {
-            // This task automatically cancels when view disappears
-            do {
-                try await model.loadData()
-            } catch {
-                // Handle error
-            }
-        }
-        .refreshable {
-            // Pull to refresh also uses async/await
-            try? await model.loadData()
-        }
-    }
-}
-```
-
-## Concurrency
-
-- **@MainActor:** All UI updates must use @MainActor isolation
-- **Actors:** Use actors for expensive operations like disk I/O, network calls, or heavy computation
-- **async/await:** Always prefer async functions over completion handlers
-- **Task:** Use structured concurrency with proper task cancellation
-- **.task modifier:** Always use .task { } on views for async operations tied to view lifecycle - it automatically handles cancellation
-- **Avoid Task { } in onAppear:** This doesn't cancel automatically and can cause memory leaks or crashes
-- No GCD usage - Swift Concurrency only
-
-### Sendable Conformance
-
-Swift 6 enforces strict concurrency checking. All types that cross concurrency boundaries must be Sendable:
-
-- **Value types (struct, enum):** Usually Sendable if all properties are Sendable
-- **Classes:** Must be marked `final` and have immutable or Sendable properties, or use `@unchecked Sendable` with thread-safe implementation
-- **@Observable classes:** Automatically Sendable when all properties are Sendable
-- **Closures:** Mark as `@Sendable` when captured by concurrent contexts
-
-```swift
-// Sendable struct - automatic conformance
-struct UserData: Sendable {
-    let id: UUID
-    let name: String
-}
-
-// Sendable class - must be final with immutable properties
-final class Configuration: Sendable {
-    let apiKey: String
-    let endpoint: URL
-    
-    init(apiKey: String, endpoint: URL) {
-        self.apiKey = apiKey
-        self.endpoint = endpoint
-    }
-}
-
-// @Observable with Sendable
-@Observable
-final class UserModel: Sendable {
-    var name: String = ""
-    var age: Int = 0
-    // Automatically Sendable if all stored properties are Sendable
-}
-
-// Using @unchecked Sendable for thread-safe types
-final class Cache: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage: [String: Any] = [:]
-    
-    func get(_ key: String) -> Any? {
-        lock.withLock { storage[key] }
-    }
-}
-
-// @Sendable closures
-func processInBackground(completion: @Sendable @escaping (Result<Data, Error>) -> Void) {
-    Task {
-        // Processing...
-        completion(.success(data))
-    }
-}
-```
-
-## Code Organization
-
-- Keep functions focused on a single responsibility
-- Break large functions (>50 lines) into smaller, testable units
-- Use extensions to organize code by feature or protocol conformance
-- Prefer `let` over `var` - use immutability by default
-- Use `[weak self]` in closures to prevent retain cycles
-- Always include `self.` when referring to instance properties in closures
-
-# Testing Guidelines
-
-We use **Swift Testing** framework (not XCTest) for all tests. Tests live in the package test target.
-
-## Swift Testing Basics
-
-```swift
-import Testing
-
-@Test func userCanLogin() async throws {
-    let service = AuthService()
-    let result = try await service.login(username: "test", password: "pass")
-    #expect(result.isSuccess)
-    #expect(result.user.name == "Test User")
-}
-
-@Test("User sees error with invalid credentials")
-func invalidLogin() async throws {
-    let service = AuthService()
-    await #expect(throws: AuthError.self) {
-        try await service.login(username: "", password: "")
-    }
-}
-```
-
-## Key Swift Testing Features
-
-- **@Test:** Marks a test function (replaces XCTest's test prefix)
-- **@Suite:** Groups related tests together
-- **#expect:** Validates conditions (replaces XCTAssert)
-- **#require:** Like #expect but stops test execution on failure
-- **Parameterized Tests:** Use @Test with arguments for data-driven tests
-- **async/await:** Full support for testing async code
-- **Traits:** Add metadata like `.bug()`, `.feature()`, or custom tags
-
-## Test Organization
-
-- Write tests in the package's Tests/ directory
-- One test file per source file when possible
-- Name tests descriptively explaining what they verify
-- Test both happy paths and edge cases
-- Add tests for bug fixes to prevent regression
-
-# Entitlements Management
-
-This template includes a **declarative entitlements system** that AI agents can safely modify without touching Xcode project files.
-
-## How It Works
-
-- **Entitlements File**: `Config/lfm2onios.entitlements` contains all app capabilities
-- **XCConfig Integration**: `CODE_SIGN_ENTITLEMENTS` setting in `Config/Shared.xcconfig` points to the entitlements file
-- **AI-Friendly**: Agents can edit the XML file directly to add/remove capabilities
-
-## Adding Entitlements
-
-To add capabilities to your app, edit `Config/lfm2onios.entitlements`:
-
-## Common Entitlements
-
-| Capability | Entitlement Key | Value |
-|------------|-----------------|-------|
-| HealthKit | `com.apple.developer.healthkit` | `<true/>` |
-| CloudKit | `com.apple.developer.icloud-services` | `<array><string>CloudKit</string></array>` |
-| Push Notifications | `aps-environment` | `development` or `production` |
-| App Groups | `com.apple.security.application-groups` | `<array><string>group.id</string></array>` |
-| Keychain Sharing | `keychain-access-groups` | `<array><string>$(AppIdentifierPrefix)bundle.id</string></array>` |
-| Background Modes | `com.apple.developer.background-modes` | `<array><string>mode-name</string></array>` |
-| Contacts | `com.apple.developer.contacts.notes` | `<true/>` |
-| Camera | `com.apple.developer.avfoundation.audio` | `<true/>` |
-
-# XcodeBuildMCP Tool Usage
-
-To work with this project, build, test, and development commands should use XcodeBuildMCP tools instead of raw command-line calls.
-
-## Project Discovery & Setup
+**Use XcodeBuildMCP tools** (preferred over raw xcodebuild):
 
 ```javascript
-// Discover Xcode projects in the workspace
-discover_projs({
-    workspaceRoot: "/path/to/YourApp"
-})
+// List simulators
+list_sims({ enabled: true })
 
-// List available schemes
-list_schems_ws({
-    workspacePath: "/path/to/YourApp.xcworkspace"
-})
-```
-
-## Building for Simulator
-
-```javascript
-// Build for iPhone simulator by name
-build_sim_name_ws({
-    workspacePath: "/path/to/YourApp.xcworkspace",
-    scheme: "YourApp",
-    simulatorName: "iPhone 16",
-    configuration: "Debug"
-})
-
-// Build and run in one step
-build_run_sim_name_ws({
-    workspacePath: "/path/to/YourApp.xcworkspace",
-    scheme: "YourApp", 
+// Build and run on iPhone 16 simulator
+build_run_sim({
+    workspacePath: "/path/to/lfm2onios.xcworkspace",
+    scheme: "lfm2onios",
     simulatorName: "iPhone 16"
 })
-```
 
-## Building for Device
-
-```javascript
-// List connected devices first
-list_devices()
-
-// Build for physical device
+// Build for device
 build_dev_ws({
-    workspacePath: "/path/to/YourApp.xcworkspace",
-    scheme: "YourApp",
+    workspacePath: "/path/to/lfm2onios.xcworkspace",
+    scheme: "lfm2onios",
     configuration: "Debug"
 })
 ```
@@ -483,252 +76,322 @@ build_dev_ws({
 ## Testing
 
 ```javascript
-// Run tests on simulator
+// Run all tests on simulator
 test_sim_name_ws({
-    workspacePath: "/path/to/YourApp.xcworkspace",
-    scheme: "YourApp",
+    workspacePath: "/path/to/lfm2onios.xcworkspace",
+    scheme: "lfm2onios",
     simulatorName: "iPhone 16"
 })
 
-// Run tests on device
-test_device_ws({
-    workspacePath: "/path/to/YourApp.xcworkspace",
-    scheme: "YourApp",
-    deviceId: "DEVICE_UUID_HERE"
-})
-
-// Test Swift Package
-swift_package_test({
-    packagePath: "/path/to/YourAppPackage"
-})
+// IMPORTANT: Use test_sim_name_ws, NOT swift_package_test
 ```
 
-## Simulator Management
+## Simulator Automation
 
 ```javascript
-// List available simulators
-list_sims({
-    enabled: true
-})
+// Get UI hierarchy for testing
+describe_ui({ simulatorUuid: "UUID" })
 
-// Boot simulator
-boot_sim({
-    simulatorUuid: "SIMULATOR_UUID"
-})
-
-// Install app
-install_app_sim({
-    simulatorUuid: "SIMULATOR_UUID",
-    appPath: "/path/to/YourApp.app"
-})
-
-// Launch app
-launch_app_sim({
-    simulatorUuid: "SIMULATOR_UUID",
-    bundleId: "com.example.YourApp"
-})
-```
-
-## Device Management
-
-```javascript
-// Install on device
-install_app_device({
-    deviceId: "DEVICE_UUID",
-    appPath: "/path/to/YourApp.app"
-})
-
-// Launch on device
-launch_app_device({
-    deviceId: "DEVICE_UUID",
-    bundleId: "com.example.YourApp"
-})
-```
-
-## UI Automation
-
-```javascript
-// Get UI hierarchy
-describe_ui({
-    simulatorUuid: "SIMULATOR_UUID"
-})
-
-// Tap element
-tap({
-    simulatorUuid: "SIMULATOR_UUID",
-    x: 100,
-    y: 200
-})
+// Tap at coordinates
+tap({ simulatorUuid: "UUID", x: 100, y: 200 })
 
 // Type text
-type_text({
-    simulatorUuid: "SIMULATOR_UUID",
-    text: "Hello World"
-})
+type_text({ simulatorUuid: "UUID", text: "Hello" })
 
 // Take screenshot
-screenshot({
-    simulatorUuid: "SIMULATOR_UUID"
-})
+screenshot({ simulatorUuid: "UUID" })
+
+// Capture logs
+start_sim_log_cap({ simulatorUuid: "UUID", bundleId: "com.oneoffrepo.lfm2onios" })
+stop_sim_log_cap({ logSessionId: "SESSION_ID" })
 ```
 
-## Log Capture
+# Core Architecture Patterns
 
-```javascript
-// Start capturing simulator logs
-start_sim_log_cap({
-    simulatorUuid: "SIMULATOR_UUID",
-    bundleId: "com.example.YourApp"
-})
+## Service Layer
 
-// Stop and retrieve logs
-stop_sim_log_cap({
-    logSessionId: "SESSION_ID"
-})
+The app uses **actor-based services** for thread-safe LLM operations:
 
-// Device logs
-start_device_log_cap({
-    deviceId: "DEVICE_UUID",
-    bundleId: "com.example.YourApp"
-})
+- **ModelCatalog**: Static catalog of LFM2 and Gemma models with metadata
+- **ModelDownloadService**: Handles model downloads with progress tracking
+- **ModelStorageService**: Manages downloaded bundles (ZIP and directory formats)
+- **ModelRuntimeService** (actor): Thread-safe model loading and inference coordination
+- **PersistenceService**: UserDefaults for selected model preferences
+- **SpeechRecognitionService**: Speech-to-text via iOS Speech framework
+
+## Runtime Adapters Pattern
+
+The app abstracts LLM engines using the **Adapter pattern**:
+
+```swift
+protocol ModelRuntimeAdapter {
+    func loadModel(url: URL) async throws
+    func unloadModel() async
+    func generateResponse(prompt: String, stream: AsyncStream<String>) async throws
+}
+
+// Implementations:
+class LeapRuntimeAdapter: ModelRuntimeAdapter { /* Leap SDK */ }
+class GemmaRuntimeAdapter: ModelRuntimeAdapter { /* MLX Swift */ }
 ```
 
-## Utility Functions
+`ModelRuntimeService` (actor) selects the correct adapter based on model provider:
+- LFM2 models → `LeapRuntimeAdapter`
+- Gemma models → `GemmaRuntimeAdapter`
 
-```javascript
-// Get bundle ID from app
-get_app_bundle_id({
-    appPath: "/path/to/YourApp.app"
-})
+## State Management (MV Pattern)
 
-// Clean build artifacts
-clean_ws({
-    workspacePath: "/path/to/YourApp.xcworkspace"
-})
+Uses SwiftUI's native state management:
 
-// Get app path for simulator
-get_sim_app_path_name_ws({
-    workspacePath: "/path/to/YourApp.xcworkspace",
-    scheme: "YourApp",
-    platform: "iOS Simulator",
-    simulatorName: "iPhone 16"
-})
+```swift
+@Observable
+class ChatState {
+    var messages: [Message] = []
+    var isGenerating = false
+    var currentModel: ModelInfo?
+}
+
+struct ChatView: View {
+    @State private var chatState = ChatState()
+    @Environment(ModelRuntimeService.self) private var runtime
+
+    var body: some View {
+        // View is pure representation of state
+    }
+}
 ```
+
+**Key principles:**
+- `@State` for view-local state
+- `@Observable` for shared models (not ViewModels!)
+- `@Environment` for app-wide services
+- `.task` modifier for async operations (auto-cancels on disappear)
+
+## Conversation History (SwiftData)
+
+Chat sessions persist using SwiftData:
+
+```swift
+@Model
+final class Conversation {
+    var id: UUID
+    var title: String
+    var modelSlug: String
+    @Relationship(deleteRule: .cascade) var messages: [Message]
+}
+
+// Usage in views
+@Query private var conversations: [Conversation]
+@Environment(\.modelContext) private var context
+```
+
+# LLM Integration Details
+
+## Leap SDK (LFM2 Models)
+
+- **SDK Version:** 0.5.0+
+- **Models:** LFM2-350M, LFM2-700M, LFM2-1.2B (8DA4W quantization)
+- **Download:** `LeapModelDownloader.requestDownloadModel()` + polling
+- **Inference:** `Conversation.generateResponse(prompt:)` for streaming
+
+## MLX Swift (Gemma Models)
+
+- **SDK Version:** 0.25.6+ (mlx-swift, mlx-swift-examples)
+- **Models:** Gemma-2B-IT, Gemma-2.6B-IT (4-bit quantized)
+- **Download:** Hugging Face Hub API (`HubApi.snapshot()`)
+- **Inference:** `MLXLLM.generate(prompt:)` with custom streaming
+
+## Bundle Format Support
+
+Both ZIP and directory bundles are supported:
+- **Leap SDK:** Downloads ZIP bundles (`.bundle` files)
+- **MLX/Gemma:** Downloads directory bundles from Hugging Face
+- Storage/runtime services auto-detect format
+
+# Speech Recognition Integration
+
+Uses iOS Speech framework for microphone input:
+
+- **Service:** `SpeechRecognitionService` (actor) handles speech requests
+- **Permissions:** `NSSpeechRecognitionUsageDescription` and `NSMicrophoneUsageDescription` in Info.plist
+- **UI:** `MicrophoneInputBar` with visual feedback during recording
+- **Entitlements:** `Config/lfm2onios.entitlements` includes microphone access
+
+# Key Implementation Notes
+
+## Model Download Progress
+
+Leap SDK uses **polling-based progress**:
+
+```swift
+// Start download
+downloader.requestDownloadModel(model)
+
+// Poll for progress
+while true {
+    let status = await downloader.queryStatus(model)
+    switch status {
+    case .downloadInProgress(let progress):
+        updateUI(progress) // 0.0 to 1.0
+    case .downloaded:
+        break
+    }
+}
+```
+
+## Gemma Model Normalization
+
+Gemma models require **config normalization** due to safetensors format issues:
+
+- `GemmaConfigNormalizer`: Rewrites safetensor headers with sanitized keys
+- Fixes "missingKey" errors during model load
+- Backfills index keys from safetensors header
+
+## Safe Model Switching
+
+Always unload before switching models:
+
+```swift
+await runtimeService.unloadModel() // Cleans up ModelRunner/Conversation
+await runtimeService.loadModel(newModelURL)
+```
+
+## Concurrency Patterns
+
+- **Actor isolation:** `ModelRuntimeService` is an actor for thread safety
+- **@MainActor:** All UI updates use `@MainActor` isolation
+- **Structured concurrency:** Use `.task` modifier, not `Task { }` in `onAppear`
+- **Sendable conformance:** All types crossing actor boundaries are Sendable
+
+# Testing
+
+Uses **Swift Testing framework** (not XCTest):
+
+```swift
+import Testing
+
+@Test func modelCatalogHasModels() {
+    #expect(ModelCatalog.allModels.count > 0)
+}
+
+@Test("Download service handles progress")
+func downloadProgress() async throws {
+    let service = ModelDownloadService()
+    // Test implementation
+    #expect(progress >= 0.0 && progress <= 1.0)
+}
+```
+
+**Test files:** `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/`
+
+**Run tests:** Use `test_sim_name_ws` tool (NOT `swift_package_test`)
+
+# Logging
+
+Uses Apple Unified Logging with structured JSON:
+
+```swift
+import os
+let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "runtime")
+
+logger.info("{ event: \"load:start\", url: \"\(url.path)\" }")
+logger.info("{ event: \"stream:complete\", tokens: \(count), usage: \(tps) }")
+```
+
+**Categories:** `app`, `download`, `runtime`, `ui`, `storage`, `speech`
 
 # Development Workflow
 
-1. **Make changes in the Package**: All feature development happens in YourAppPackage/Sources/
-2. **Write tests**: Add Swift Testing tests in YourAppPackage/Tests/
-3. **Build and test**: Use XcodeBuildMCP tools to build and run tests
-4. **Run on simulator**: Deploy to simulator for manual testing
-5. **UI automation**: Use describe_ui and automation tools for UI testing
-6. **Device testing**: Deploy to physical device when needed
+1. **Make changes** in `lfm2oniosPackage/Sources/lfm2oniosFeature/`
+2. **Write tests** in `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/`
+3. **Build & test** using XcodeBuildMCP tools
+4. **Deploy to simulator** for manual testing
+5. **Verify with automation** (describe_ui, tap, screenshot)
+6. **IMPORTANT:** After functional changes, deploy to simulator and test using XcodeBuildMCP
 
-# Best Practices
+# Common Tasks
 
-## SwiftUI & State Management
+## Add New Model
 
-- Keep views small and focused
-- Extract reusable components into their own files
-- Use @ViewBuilder for conditional view composition
-- Leverage SwiftUI's built-in animations and transitions
-- Avoid massive body computations - break them down
-- **Always use .task modifier** for async work tied to view lifecycle - it automatically cancels when the view disappears
-- Never use Task { } in onAppear - use .task instead for proper lifecycle management
+1. Update `ModelCatalog.swift` with model metadata
+2. Add download adapter in `ModelDownloadAdapters.swift`
+3. Update runtime adapter selection logic if new provider
 
-## Performance
+## Add New Feature
 
-- Use .id() modifier sparingly as it forces view recreation
-- Implement Equatable on models to optimize SwiftUI diffing
-- Use LazyVStack/LazyHStack for large lists
-- Profile with Instruments when needed
-- @Observable tracks only accessed properties, improving performance over @Published
+1. Create SwiftUI view in `lfm2oniosPackage/Sources/lfm2oniosFeature/`
+2. Add `@Observable` models if needed (no ViewModels!)
+3. Use `.task` for async operations
+4. Write tests in `Tests/` directory
+5. Mark public types/methods as `public` if exposed to app target
 
-## Accessibility
+## Add SPM Dependency
 
-- Always provide accessibilityLabel for interactive elements
-- Use accessibilityIdentifier for UI testing
-- Implement accessibilityHint where actions aren't obvious
-- Test with VoiceOver enabled
-- Support Dynamic Type
-
-## Security & Privacy
-
-- Never log sensitive information
-- Use Keychain for credential storage
-- All network calls must use HTTPS
-- Request minimal permissions
-- Follow App Store privacy guidelines
-
-## Data Persistence
-
-When data persistence is required, always prefer **SwiftData** over CoreData. However, carefully consider whether persistence is truly necessary - many apps can function well with in-memory state that loads on launch.
-
-### When to Use SwiftData
-
-- You have complex relational data that needs to persist across app launches
-- You need advanced querying capabilities with predicates and sorting
-- You're building a data-heavy app (note-taking, inventory, task management)
-- You need CloudKit sync with minimal configuration
-
-### When NOT to Use Data Persistence
-
-- Simple user preferences (use UserDefaults)
-- Temporary state that can be reloaded from network
-- Small configuration data (consider JSON files or plist)
-- Apps that primarily display remote data
-
-### SwiftData Best Practices
+Edit `lfm2oniosPackage/Package.swift`:
 
 ```swift
-import SwiftData
-
-@Model
-final class Task {
-    var title: String
-    var isCompleted: Bool
-    var createdAt: Date
-    
-    init(title: String) {
-        self.title = title
-        self.isCompleted = false
-        self.createdAt = Date()
-    }
-}
-
-// In your app
-@main
-struct lfm2oniosApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .modelContainer(for: Task.self)
-        }
-    }
-}
-
-// In your views
-struct TaskListView: View {
-    @Query private var tasks: [Task]
-    @Environment(\.modelContext) private var context
-    
-    var body: some View {
-        List(tasks) { task in
-            Text(task.title)
-        }
-        .toolbar {
-            Button("Add") {
-                let newTask = Task(title: "New Task")
-                context.insert(newTask)
-            }
-        }
-    }
-}
+dependencies: [
+    .package(url: "https://github.com/example/Package", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "lfm2oniosFeature",
+        dependencies: ["Package"]
+    )
+]
 ```
 
-**Important:** Never use CoreData for new projects. SwiftData provides a modern, type-safe API that's easier to work with and integrates seamlessly with SwiftUI.
+## Add Entitlements
 
----
+Edit `Config/lfm2onios.entitlements` (XML format):
 
-Remember: This project prioritizes clean, simple SwiftUI code using the platform's native state management. Keep the app shell minimal and implement all features in the Swift Package.
-- if you make a functional change or bug fix, please deploy to the simulator and test the change (using xcodebuildmcp)
+```xml
+<key>com.apple.developer.some-capability</key>
+<true/>
+```
+
+Common entitlements table in template documentation applies.
+
+# Performance Characteristics
+
+- **Model Load Time:** ~0.33s (LFM2-350M), ~1.5s (Gemma-2B)
+- **Inference Speed:** ~127 tokens/sec (LFM2 on simulator), ~45 tokens/sec (Gemma)
+- **Memory Usage:** 300-900MB depending on model size
+- **Context Window:** 4096 tokens (LFM2), 8192 tokens (Gemma)
+- **Storage:** 320MB (LFM2-350M), 920MB (LFM2-1.2B), 1.5GB (Gemma-2B)
+
+# Troubleshooting
+
+## Common Issues
+
+**Download stuck at 0%:** Use `requestDownloadModel()` + polling (not `downloadModel()`)
+
+**Model load failures:** Check bundle format (ZIP vs directory), verify normalizer for Gemma
+
+**Speech recognition not working:** Verify entitlements and Info.plist permissions
+
+**Build errors:** Clean build folder (`clean_ws`) and rebuild SPM packages
+
+## Error Handling
+
+- Download failures: Retry logic with exponential backoff
+- Model load failures: Safe fallback to model selection screen
+- Speech errors: Graceful degradation to text input only
+- Storage issues: Pre-download space checks
+
+# Code Style
+
+- **Naming:** UpperCamelCase types, lowerCamelCase properties/functions
+- **Immutability:** Prefer `let` over `var`
+- **Early returns:** Avoid nested conditionals
+- **No force-unwrap:** Use `guard let` or `if let`
+- **Accessibility:** All interactive elements need `accessibilityLabel`
+- **No ViewModels:** Use SwiftUI native state management
+
+# References
+
+- **Leap SDK Docs:** https://leap.liquid.ai/docs/edge-sdk/ios/ios-quick-start-guide
+- **MLX Swift:** https://github.com/ml-explore/mlx-swift
+- **Swift Testing:** https://developer.apple.com/documentation/testing
+- **Project PRD:** `docs/PRD.md`
+- **Cursor Rules:** `.cursor/rules/*.mdc` for detailed patterns

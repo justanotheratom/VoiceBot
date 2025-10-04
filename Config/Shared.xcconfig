@@ -23,7 +23,7 @@ CODE_SIGN_STYLE = Automatic
 // ==========================================
 // Platform Configuration
 // ==========================================
-IPHONEOS_DEPLOYMENT_TARGET = 17.2
+IPHONEOS_DEPLOYMENT_TARGET = 18.0
 
 // (1 == iPhone, 2 == iPad)
 TARGETED_DEVICE_FAMILY = 1,2 
@@ -34,6 +34,8 @@ TARGETED_DEVICE_FAMILY = 1,2
 GENERATE_INFOPLIST_FILE = YES
 INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait
 INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
+INFOPLIST_KEY_NSMicrophoneUsageDescription = Voice input is used to capture your prompts for chat conversations.
+INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = Speech recognition converts your voice into text before sending it to the assistant.
 
 // ==========================================
 // Entitlements
