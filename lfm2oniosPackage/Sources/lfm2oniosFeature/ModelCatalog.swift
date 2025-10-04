@@ -206,6 +206,35 @@ public enum ModelCatalog {
                 ]
             ),
             systemPrompt: "You are Gemma, an on-device assistant. Answer user questions directly with a short, factual reply. Do not repeat phrases or re-state that you are answering; simply provide the response and stop."
+        ),
+        ModelCatalogEntry(
+            id: "lfm2-350m-mlx",
+            displayName: "LFM2 350M (MLX)",
+            provider: "LiquidAI",
+            slug: "lfm2-350m-mlx",
+            quantizationSlug: nil,
+            estDownloadMB: 204,
+            contextWindow: 4096,
+            shortDescription: "LFM2 350M 4-bit running via MLX runtime",
+            downloadURLString: nil,
+            runtime: .mlx,
+            gemmaMetadata: .init(
+                assetIdentifier: "lfm2-350m-4bit",
+                repoID: "mlx-community/LFM2-350M-4bit",
+                revision: "main",
+                primaryFilePath: "model.safetensors",
+                matchingGlobs: [
+                    "model.safetensors",
+                    "model.safetensors.index.json",
+                    "tokenizer.json",
+                    "tokenizer_config.json",
+                    "config.json",
+                    "generation_config.json",
+                    "special_tokens_map.json",
+                    "chat_template.jinja"
+                ]
+            ),
+            systemPrompt: nil
         )
     ]
 
