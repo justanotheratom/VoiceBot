@@ -30,6 +30,9 @@ private let gemmaRepetitionPenalty: Float = 1.15
 /// Sliding window size (in tokens) used by the repetition penalty processor.
 private let gemmaRepetitionContextSize: Int = 128
 
+/// Stop sequences emitted by Gemma chat template that should terminate generation.
+private let gemmaStopSequences: [String] = ["<end_of_turn>", "<start_of_turn>"]
+
 final actor GemmaRuntimeAdapter: ModelRuntimeAdapting {
     private var inferenceService: GemmaInferenceService?
     private var modelDirectory: URL?
@@ -91,6 +94,7 @@ final actor GemmaRuntimeAdapter: ModelRuntimeAdapting {
 
         let generationParameters = makeGenerationParameters(limit: tokenLimit)
         var repetitionGuard = RepetitionGuard(prompt: prompt)
+        var stopScanner = StopSequenceScanner(stopSequences: gemmaStopSequences)
 
         let stream = try await inferenceService.tokenStream(
             conversation: conversationForModel,
@@ -101,16 +105,24 @@ final actor GemmaRuntimeAdapter: ModelRuntimeAdapting {
         for try await token in stream {
             try Task.checkCancellation()
 
-            let decision = repetitionGuard.register(token)
-            await onToken(token)
+            let (emittable, didHitStop) = stopScanner.consume(token)
 
-            if case let .stop(reason, repeats, sample) = decision {
-                let sanitizedSample = sanitizeForLog(sample)
-                AppLogger.runtime().log(event: "gemma:repeatGuard", data: [
-                    "reason": reason,
-                    "repeats": repeats,
-                    "sample": sanitizedSample
-                ], level: .error)
+            if !emittable.isEmpty {
+                let decision = repetitionGuard.register(emittable)
+                await onToken(emittable)
+
+                if case let .stop(reason, repeats, sample) = decision {
+                    let sanitizedSample = sanitizeForLog(sample)
+                    AppLogger.runtime().log(event: "gemma:repeatGuard", data: [
+                        "reason": reason,
+                        "repeats": repeats,
+                        "sample": sanitizedSample
+                    ], level: .error)
+                    break
+                }
+            }
+
+            if didHitStop {
                 break
             }
         }
@@ -226,5 +238,53 @@ private struct RepetitionGuard {
         let scalars = text.lowercased().unicodeScalars.filter { allowed.contains($0) }
         let cleaned = String(String.UnicodeScalarView(scalars))
         return cleaned.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+}
+
+private struct StopSequenceScanner {
+    private let stopSequences: [String]
+    private let maxStopLength: Int
+    private var tail: String = ""
+
+    init(stopSequences: [String]) {
+        self.stopSequences = stopSequences
+        self.maxStopLength = stopSequences.map { $0.count }.max() ?? 0
+    }
+
+    mutating func consume(_ chunk: String) -> (String, Bool) {
+        guard !stopSequences.isEmpty else { return (chunk, false) }
+
+        let combined = tail + chunk
+
+        var earliestRange: Range<String.Index>? = nil
+        for stop in stopSequences {
+            if let range = combined.range(of: stop) {
+                if earliestRange == nil || range.lowerBound < earliestRange!.lowerBound {
+                    earliestRange = range
+                }
+            }
+        }
+
+        if let matchRange = earliestRange {
+            let emission = String(combined[..<matchRange.lowerBound])
+            tail = ""
+            return (emission, true)
+        }
+
+        if maxStopLength <= 1 {
+            tail = ""
+            return (combined, false)
+        }
+
+        let keepLength = min(maxStopLength - 1, combined.count)
+        if keepLength <= 0 {
+            tail = ""
+            return (combined, false)
+        }
+
+        let cutIndex = combined.index(combined.endIndex, offsetBy: -keepLength)
+        let emission = String(combined[..<cutIndex])
+        tail = String(combined[cutIndex...])
+        return (emission, false)
     }
 }
