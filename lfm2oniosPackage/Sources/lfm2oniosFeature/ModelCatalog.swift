@@ -175,10 +175,7 @@ public enum ModelCatalog {
                     "chat_template.jinja",
                     "tokenizer.model",
                     "model.safetensors.index.json",
-                    "model.safetensors",
-                    "model-00001-of-00003.safetensors",
-                    "model-00002-of-00003.safetensors",
-                    "model-00003-of-00003.safetensors"
+                    "model.safetensors"
                 ]
             ),
             systemPrompt: "You are Gemma, an on-device assistant. Answer user questions directly with a short, factual reply. Do not repeat phrases or re-state that you are answering; simply provide the response and stop."

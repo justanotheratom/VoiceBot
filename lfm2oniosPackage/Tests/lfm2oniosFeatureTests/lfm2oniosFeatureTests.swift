@@ -398,6 +398,24 @@ func gemmaConfigNormalizerFlattensIntermediateSize() throws {
     let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted])
     try data.write(to: configURL)
 
+    // Create aggregate weight file placeholder to trigger index normalization
+    let aggregateURL = tempDirectory.appendingPathComponent("model.safetensors")
+    FileManager.default.createFile(atPath: aggregateURL.path, contents: Data())
+
+    let indexURL = tempDirectory.appendingPathComponent("model.safetensors.index.json")
+    let indexPayload: [String: Any] = [
+        "metadata": [
+            "total_parameters": 1,
+            "total_size": 1
+        ],
+        "weight_map": [
+            "foo.weight": "model-00001-of-00003.safetensors",
+            "bar.weight": "model-00002-of-00003.safetensors"
+        ]
+    ]
+    let indexData = try JSONSerialization.data(withJSONObject: indexPayload, options: [.prettyPrinted])
+    try indexData.write(to: indexURL)
+
     GemmaConfigNormalizer.normalizeIfNeeded(in: tempDirectory)
 
     let normalizedData = try Data(contentsOf: configURL)
@@ -408,6 +426,12 @@ func gemmaConfigNormalizerFlattensIntermediateSize() throws {
 
     #expect(intermediateSize == 8192)
     #expect(queryPreAttnScalar == 256)
+
+    let normalizedIndexData = try Data(contentsOf: indexURL)
+    let indexRoot = try JSONSerialization.jsonObject(with: normalizedIndexData) as? [String: Any]
+    let weightMap = indexRoot?["weight_map"] as? [String: String]
+
+    #expect(weightMap?.values.allSatisfy { $0 == "model.safetensors" } == true)
 }
 
 @Test("TitleGenerationService fallback title generation")
