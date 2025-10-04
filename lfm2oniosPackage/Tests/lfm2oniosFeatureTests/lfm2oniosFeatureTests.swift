@@ -400,13 +400,12 @@ func gemmaConfigNormalizerFlattensIntermediateSize() throws {
 
     // Create aggregate weight file placeholder to trigger index normalization
     let aggregateURL = tempDirectory.appendingPathComponent("model.safetensors")
-    FileManager.default.createFile(atPath: aggregateURL.path, contents: Data())
 
     let indexURL = tempDirectory.appendingPathComponent("model.safetensors.index.json")
     let indexPayload: [String: Any] = [
         "metadata": [
-            "total_parameters": 1,
-            "total_size": 1
+            "total_parameters": 2,
+            "total_size": 8
         ],
         "weight_map": [
             "foo.weight": "model-00001-of-00003.safetensors",
@@ -415,6 +414,28 @@ func gemmaConfigNormalizerFlattensIntermediateSize() throws {
     ]
     let indexData = try JSONSerialization.data(withJSONObject: indexPayload, options: [.prettyPrinted])
     try indexData.write(to: indexURL)
+
+    let headerPayload: [String: Any] = [
+        "__metadata__": [:],
+        "foo.weight": [
+            "dtype": "F32",
+            "shape": [1],
+            "data_offsets": [0, 4]
+        ],
+        "bar.weight": [
+            "dtype": "F32",
+            "shape": [1],
+            "data_offsets": [4, 8]
+        ]
+    ]
+
+    let headerData = try JSONSerialization.data(withJSONObject: headerPayload, options: [])
+    var headerSizeLE = UInt64(headerData.count).littleEndian
+    var aggregateData = Data()
+    withUnsafeBytes(of: &headerSizeLE) { aggregateData.append(contentsOf: $0) }
+    aggregateData.append(headerData)
+    aggregateData.append(Data(count: 8))
+    try aggregateData.write(to: aggregateURL)
 
     GemmaConfigNormalizer.normalizeIfNeeded(in: tempDirectory)
 
@@ -431,7 +452,8 @@ func gemmaConfigNormalizerFlattensIntermediateSize() throws {
     let indexRoot = try JSONSerialization.jsonObject(with: normalizedIndexData) as? [String: Any]
     let weightMap = indexRoot?["weight_map"] as? [String: String]
 
-    #expect(weightMap?.values.allSatisfy { $0 == "model.safetensors" } == true)
+    #expect(weightMap?["foo.weight"] == "model.safetensors")
+    #expect(weightMap?["bar.weight"] == "model.safetensors")
 }
 
 @Test("TitleGenerationService fallback title generation")
