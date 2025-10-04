@@ -109,6 +109,7 @@ struct ChatView: View {
     @State private var showSettings = false
     @State private var streamingTask: Task<Void, Never>?
     @State private var shouldScrollToBottom = false
+    @State private var currentPairIndex = 0
     @State private var scrollTimer: Timer?
     @State private var showingConversationHistory = false
     @State private var isRecording = false
@@ -334,61 +335,89 @@ struct ChatView: View {
     
     @ViewBuilder
     private var messagesView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    // Only show the latest user-assistant pair
-                    ForEach(Array(latestMessagePair.enumerated()), id: \.element.id) { index, msg in
-                        VStack(spacing: 12) {
-                            ChatMessageView(message: msg, isStreaming: isStreaming && msg.id == messages.last?.id)
-                                .accessibilityIdentifier("message_\(msg.id.uuidString)")
+        ZStack(alignment: .top) {
+            TabView(selection: $currentPairIndex) {
+                ForEach(Array(messagePairs.enumerated()), id: \.offset) { pairIndex, pair in
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(Array(pair.enumerated()), id: \.element.id) { index, msg in
+                                VStack(spacing: 12) {
+                                    ChatMessageView(message: msg, isStreaming: isStreaming && msg.id == messages.last?.id)
+                                        .accessibilityIdentifier("message_\(msg.id.uuidString)")
 
-                            // Add separator after user messages (before assistant response)
-                            if msg.role == .user && index < latestMessagePair.count - 1 {
-                                Divider()
+                                    // Add separator after user messages (before assistant response)
+                                    if msg.role == .user && index < pair.count - 1 {
+                                        Divider()
+                                    }
+                                }
+                                .id(msg.id)
                             }
                         }
-                        .id(msg.id)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                     }
+                    .scrollDismissesKeyboard(.interactively)
+                    .tag(pairIndex)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
             }
-            .scrollDismissesKeyboard(.interactively)
+            .tabViewStyle(.page(indexDisplayMode: .never))
             .onChange(of: messages.count) { _, _ in
-                // Scroll to bottom when new message is added
+                // Jump to latest pair when new message is added
                 withAnimation(.easeInOut(duration: 0.3)) {
-                    if let lastMessage = latestMessagePair.last {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                    }
+                    currentPairIndex = messagePairs.count - 1
                 }
             }
-            .onChange(of: shouldScrollToBottom) { _, shouldScroll in
-                // Scroll to bottom during streaming with smooth spring animation
-                if shouldScroll, let lastMessage = latestMessagePair.last {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8, blendDuration: 0)) {
-                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+            .onAppear {
+                // Start at the latest pair
+                currentPairIndex = max(0, messagePairs.count - 1)
+            }
+
+            // Page indicator
+            if messagePairs.count > 1 {
+                HStack(spacing: 6) {
+                    ForEach(0..<messagePairs.count, id: \.self) { index in
+                        Circle()
+                            .fill(index == currentPairIndex ? Color.primary : Color.secondary.opacity(0.3))
+                            .frame(width: 6, height: 6)
                     }
-                    shouldScrollToBottom = false
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.ultraThinMaterial, in: Capsule())
+                .padding(.top, 8)
             }
         }
     }
 
-    private var latestMessagePair: [Message] {
-        // Find the last user message and its corresponding assistant response
-        guard !messages.isEmpty else { return [] }
+    private var messagePairs: [[Message]] {
+        var pairs: [[Message]] = []
+        var i = 0
 
-        // Get the last two messages if they form a user-assistant pair
-        if messages.count >= 2 {
-            let lastTwo = Array(messages.suffix(2))
-            if lastTwo[0].role == .user && lastTwo[1].role == .assistant {
-                return lastTwo
+        while i < messages.count {
+            let msg = messages[i]
+
+            if msg.role == .user {
+                // Check if there's an assistant response
+                if i + 1 < messages.count && messages[i + 1].role == .assistant {
+                    pairs.append([msg, messages[i + 1]])
+                    i += 2
+                } else {
+                    // User message without response (likely streaming)
+                    pairs.append([msg])
+                    i += 1
+                }
+            } else {
+                // Standalone assistant message (shouldn't happen normally)
+                pairs.append([msg])
+                i += 1
             }
         }
 
-        // If only one message or not a proper pair, return the last message
-        return [messages.last!]
+        return pairs.isEmpty ? [] : pairs
+    }
+
+    private var latestMessagePair: [Message] {
+        messagePairs.last ?? []
     }
     
     @ViewBuilder
