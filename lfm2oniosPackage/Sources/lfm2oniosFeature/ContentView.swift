@@ -178,18 +178,22 @@ struct ChatView: View {
         hasPrefetchedSpeechPermission = true
 
         let currentStatus = await speechService.authorizationStatus()
-        updatePermissionState(with: currentStatus)
-        microphoneErrorMessage = nil
+        await MainActor.run {
+            updatePermissionState(with: currentStatus)
+            microphoneErrorMessage = nil
+        }
 
         switch currentStatus {
         case .authorized, .denied, .restricted:
             AppLogger.ui().log(event: "mic:permissionPrefetch", data: ["status": String(describing: currentStatus)])
         case .notDetermined:
-            isRequestingSpeechPermission = true
+            await MainActor.run { isRequestingSpeechPermission = true }
             let requestedStatus = await speechService.requestAuthorization()
-            isRequestingSpeechPermission = false
-            updatePermissionState(with: requestedStatus)
-            microphoneErrorMessage = nil
+            await MainActor.run {
+                isRequestingSpeechPermission = false
+                updatePermissionState(with: requestedStatus)
+                microphoneErrorMessage = nil
+            }
             AppLogger.ui().log(event: "mic:permissionPrefetch", data: ["status": String(describing: requestedStatus)])
         }
 
@@ -202,19 +206,27 @@ struct ChatView: View {
 
         switch permission {
         case .granted:
-            recordPermission = .granted
+            await MainActor.run {
+                recordPermission = .granted
+            }
             AppLogger.ui().log(event: "mic:recordPermission", data: ["status": "granted"])
             return
         case .denied:
-            recordPermission = .denied
-            microphoneErrorMessage = "Enable microphone access in Settings."
+            await MainActor.run {
+                recordPermission = .denied
+                microphoneErrorMessage = "Enable microphone access in Settings."
+            }
             AppLogger.ui().log(event: "mic:recordPermission", data: ["status": "denied"])
             return
         case .undetermined:
-            recordPermission = .undetermined
+            await MainActor.run {
+                recordPermission = .undetermined
+            }
         @unknown default:
-            recordPermission = .denied
-            microphoneErrorMessage = "Enable microphone access in Settings."
+            await MainActor.run {
+                recordPermission = .denied
+                microphoneErrorMessage = "Enable microphone access in Settings."
+            }
             AppLogger.ui().log(event: "mic:recordPermission", data: ["status": "unknown"])
             return
         }
@@ -231,9 +243,9 @@ struct ChatView: View {
         }
         await MainActor.run {
             isRequestingRecordPermission = false
+            recordPermission = granted ? .granted : .denied
+            microphoneErrorMessage = granted ? nil : "Enable microphone access in Settings."
         }
-        recordPermission = granted ? .granted : .denied
-        microphoneErrorMessage = granted ? nil : "Enable microphone access in Settings."
         AppLogger.ui().log(event: "mic:recordPermission", data: ["status": granted ? "granted" : "denied"])
     }
 #else
