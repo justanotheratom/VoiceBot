@@ -115,6 +115,7 @@ struct ChatView: View {
     @State private var isRequestingSpeechPermission = false
     @State private var isTranscribingSpeech = false
     @State private var microphoneErrorMessage: String?
+    @State private var errorDismissTask: Task<Void, Never>?
     @State private var speechPermissionState: SpeechPermissionState = .unknown
     @State private var recordingStartTime: Date? = nil
     @State private var hasPrefetchedSpeechPermission = false
@@ -162,6 +163,25 @@ struct ChatView: View {
         Locale.current
     }
 
+    private func setMicrophoneError(_ message: String, autoDismiss: Bool = true) {
+        errorDismissTask?.cancel()
+        microphoneErrorMessage = message
+
+        if autoDismiss {
+            errorDismissTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2.5))
+                if !Task.isCancelled {
+                    clearMicrophoneError()
+                }
+            }
+        }
+    }
+
+    private func clearMicrophoneError() {
+        errorDismissTask?.cancel()
+        microphoneErrorMessage = nil
+    }
+
     private var microphoneFeedback: (text: String, color: Color)? {
         switch microphoneStatus {
         case .disabled(let message):
@@ -180,7 +200,7 @@ struct ChatView: View {
         let currentStatus = await speechService.authorizationStatus()
         await MainActor.run {
             updatePermissionState(with: currentStatus)
-            microphoneErrorMessage = nil
+            clearMicrophoneError()
         }
 
         switch currentStatus {
@@ -192,7 +212,7 @@ struct ChatView: View {
             await MainActor.run {
                 isRequestingSpeechPermission = false
                 updatePermissionState(with: requestedStatus)
-                microphoneErrorMessage = nil
+                clearMicrophoneError()
             }
             AppLogger.ui().log(event: "mic:permissionPrefetch", data: ["status": String(describing: requestedStatus)])
         }
@@ -888,7 +908,7 @@ struct ChatView: View {
 
     private func startRecordingFromUser() {
         guard microphoneIsEnabled else { return }
-        microphoneErrorMessage = nil
+        clearMicrophoneError()
 
         Task { @MainActor in
             await beginRecordingFlow()
@@ -937,7 +957,7 @@ struct ChatView: View {
         do {
             try await speechService.start(locale: localeForRecognition())
             isRecording = true
-            microphoneErrorMessage = nil
+            clearMicrophoneError()
             recordingStartTime = Date()
             AppLogger.ui().log(event: "mic:record:start", data: ["model": selected.slug])
         } catch {
@@ -970,7 +990,7 @@ struct ChatView: View {
                 elapsedMs = Int(duration * 1000)
                 if duration < 0.5 {
                     recordingStartTime = nil
-                    microphoneErrorMessage = "Hold the microphone a bit longer."
+                    setMicrophoneError("Hold the microphone a bit longer.")
                     #if os(iOS)
                     UINotificationFeedbackGenerator().notificationOccurred(.warning)
                     #endif
@@ -985,7 +1005,7 @@ struct ChatView: View {
 
             let cleaned = transcript?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !cleaned.isEmpty else {
-                microphoneErrorMessage = "I didn't catch that. Try speaking again."
+                setMicrophoneError("I didn't catch that. Try speaking again.")
                 #if os(iOS)
                 UINotificationFeedbackGenerator().notificationOccurred(.warning)
                 #endif
@@ -993,7 +1013,7 @@ struct ChatView: View {
                 return
             }
 
-            microphoneErrorMessage = nil
+            clearMicrophoneError()
             #if os(iOS)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             #endif
@@ -1029,23 +1049,23 @@ struct ChatView: View {
             switch serviceError {
             case .authorizationDenied:
                 speechPermissionState = .denied
-                microphoneErrorMessage = "Microphone access is required to capture your voice."
+                setMicrophoneError("Microphone access is required to capture your voice.", autoDismiss: false)
             case .onDeviceRecognitionUnsupported:
-                microphoneErrorMessage = "On-device speech recognition isn't supported on this device."
+                setMicrophoneError("On-device speech recognition isn't supported on this device.", autoDismiss: false)
             case .recognizerUnavailable:
-                microphoneErrorMessage = "Speech recognizer is currently unavailable."
+                setMicrophoneError("Speech recognizer is currently unavailable.")
             case .audioEngineUnavailable:
-                microphoneErrorMessage = "Couldn't access the microphone. Please try again."
+                setMicrophoneError("Couldn't access the microphone. Please try again.")
             case .recognitionFailed(let message):
-                microphoneErrorMessage = message
+                setMicrophoneError(message)
             case .recognitionAlreadyRunning:
-                microphoneErrorMessage = "A recording session is already active."
+                setMicrophoneError("A recording session is already active.")
             case .noActiveRecognition:
-                microphoneErrorMessage = "No recording session to finish."
+                setMicrophoneError("No recording session to finish.")
             }
             AppLogger.ui().logError(event: "mic:record:error", error: serviceError)
         } else {
-            microphoneErrorMessage = error.localizedDescription
+            setMicrophoneError(error.localizedDescription)
             AppLogger.ui().logError(event: "mic:record:error", error: error)
         }
 
