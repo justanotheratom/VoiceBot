@@ -606,11 +606,8 @@ struct ChatView: View {
 
         sendTranscript(trimmed)
 
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            isTextInputMode = false
-            textInputContent = ""
-            isTextFieldFocused = false
-        }
+        // Clear text but keep text input mode and focus
+        textInputContent = ""
     }
 
     @ViewBuilder
