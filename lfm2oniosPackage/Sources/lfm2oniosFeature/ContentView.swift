@@ -337,25 +337,33 @@ struct ChatView: View {
     private var messagesView: some View {
         TabView(selection: $currentPairIndex) {
             ForEach(Array(messagePairs.enumerated()), id: \.offset) { pairIndex, pair in
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(Array(pair.enumerated()), id: \.element.id) { index, msg in
-                            VStack(spacing: 12) {
+                VStack(spacing: 0) {
+                    // Pinned user message at top
+                    if let userMessage = pair.first(where: { $0.role == .user }) {
+                        VStack(spacing: 12) {
+                            ChatMessageView(message: userMessage, isStreaming: false)
+                                .accessibilityIdentifier("message_\(userMessage.id.uuidString)")
+                            Divider()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .background(Color(uiColor: .systemBackground))
+                    }
+
+                    // Scrollable assistant response
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(pair.filter { $0.role == .assistant }, id: \.id) { msg in
                                 ChatMessageView(message: msg, isStreaming: isStreaming && msg.id == messages.last?.id)
                                     .accessibilityIdentifier("message_\(msg.id.uuidString)")
-
-                                // Add separator after user messages (before assistant response)
-                                if msg.role == .user && index < pair.count - 1 {
-                                    Divider()
-                                }
+                                    .id(msg.id)
                             }
-                            .id(msg.id)
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .scrollDismissesKeyboard(.interactively)
                 }
-                .scrollDismissesKeyboard(.interactively)
                 .tag(pairIndex)
             }
         }
