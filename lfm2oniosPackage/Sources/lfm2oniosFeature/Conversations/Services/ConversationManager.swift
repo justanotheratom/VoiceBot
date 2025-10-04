@@ -49,7 +49,11 @@ class ConversationManager {
         }
         
         let message = ChatMessageModel(role: .user, content: content)
-        conversation.addMessage(message)
+        if let last = conversation.messages.last, last.role == .user {
+            conversation.replaceLastMessage(with: message)
+        } else {
+            conversation.addMessage(message)
+        }
         
         // Check if we need to archive messages using context manager
         if contextManager.shouldArchiveMessages(in: conversation) {

@@ -39,6 +39,15 @@ struct ChatConversation: Codable, Identifiable, Equatable {
         messages.append(message)
         updatedAt = Date()
     }
+
+    mutating func replaceLastMessage(with message: ChatMessageModel) {
+        guard !messages.isEmpty else {
+            addMessage(message)
+            return
+        }
+        messages[messages.count - 1] = message
+        updatedAt = Date()
+    }
     
     mutating func setTitle(_ newTitle: String) {
         title = newTitle
