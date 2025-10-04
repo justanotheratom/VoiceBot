@@ -452,17 +452,27 @@ struct ChatView: View {
     @ViewBuilder
     private var inputButton: some View {
         let longPressGesture = LongPressGesture(minimumDuration: 0.3)
-            .onChanged { _ in
-                guard microphoneIsEnabled, microphoneStatus.allowsInteraction else { return }
+            .onEnded { _ in
+                guard microphoneIsEnabled, microphoneStatus.allowsInteraction, !isStreaming else { return }
                 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 #endif
                 startRecordingFromUser()
             }
 
+        let dragGesture = DragGesture(minimumDistance: 0)
+            .onEnded { _ in
+                if isRecording {
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                    finishRecordingFromUser()
+                }
+            }
+
         let tapGesture = TapGesture()
             .onEnded {
-                guard !isStreaming else { return }
+                guard !isStreaming, !isRecording else { return }
                 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
@@ -524,14 +534,7 @@ struct ChatView: View {
         .scaleEffect(microphoneStatus == .recording ? 1.02 : 1.0)
         .opacity(microphoneIsEnabled ? 1.0 : 0.5)
         .simultaneousGesture(tapGesture)
-        .simultaneousGesture(longPressGesture.sequenced(before: DragGesture(minimumDistance: 0))
-            .onEnded { _ in
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
-                finishRecordingFromUser()
-            }
-        )
+        .simultaneousGesture(longPressGesture.sequenced(before: dragGesture))
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: microphoneStatus)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(microphoneAccessibilityLabel)
