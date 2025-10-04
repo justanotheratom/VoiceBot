@@ -120,6 +120,9 @@ struct ChatView: View {
     @State private var speechPermissionState: SpeechPermissionState = .unknown
     @State private var recordingStartTime: Date? = nil
     @State private var hasPrefetchedSpeechPermission = false
+    @State private var isTextInputMode = false
+    @State private var textInputContent = ""
+    @FocusState private var isTextFieldFocused: Bool
 #if os(iOS)
     @State private var isRequestingRecordPermission = false
     @State private var recordPermission: MicrophonePermissionState = .undetermined
@@ -417,10 +420,14 @@ struct ChatView: View {
     private var inputBarView: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                // Compact microphone button with state-aware design
-                microphoneButton
+                // Input button or text field
+                if isTextInputMode {
+                    textInputField
+                } else {
+                    inputButton
+                }
 
-                // Stop button (replaces mic during streaming)
+                // Stop button (replaces input during streaming)
                 if isStreaming {
                     stopButton
                         .transition(.scale.combined(with: .opacity))
@@ -443,8 +450,8 @@ struct ChatView: View {
     }
 
     @ViewBuilder
-    private var microphoneButton: some View {
-        let gesture = DragGesture(minimumDistance: 0)
+    private var inputButton: some View {
+        let longPressGesture = LongPressGesture(minimumDuration: 0.3)
             .onChanged { _ in
                 guard microphoneIsEnabled, microphoneStatus.allowsInteraction else { return }
                 #if os(iOS)
@@ -452,11 +459,17 @@ struct ChatView: View {
                 #endif
                 startRecordingFromUser()
             }
-            .onEnded { _ in
+
+        let tapGesture = TapGesture()
+            .onEnded {
+                guard !isStreaming else { return }
                 #if os(iOS)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 #endif
-                finishRecordingFromUser()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isTextInputMode = true
+                    isTextFieldFocused = true
+                }
             }
 
         HStack(spacing: 10) {
@@ -510,12 +523,91 @@ struct ChatView: View {
         .contentShape(RoundedRectangle(cornerRadius: 22))
         .scaleEffect(microphoneStatus == .recording ? 1.02 : 1.0)
         .opacity(microphoneIsEnabled ? 1.0 : 0.5)
-        .gesture(gesture)
+        .simultaneousGesture(tapGesture)
+        .simultaneousGesture(longPressGesture.sequenced(before: DragGesture(minimumDistance: 0))
+            .onEnded { _ in
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+                finishRecordingFromUser()
+            }
+        )
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: microphoneStatus)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(microphoneAccessibilityLabel)
         .accessibilityHint(microphoneAccessibilityHint)
         .accessibilityAddTraits(.isButton)
+    }
+
+    @ViewBuilder
+    private var textInputField: some View {
+        HStack(spacing: 10) {
+            // Text field
+            TextField("Type your message...", text: $textInputContent)
+                .focused($isTextFieldFocused)
+                .font(.subheadline)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background {
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(.ultraThinMaterial)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22)
+                        .strokeBorder(.quaternary, lineWidth: 0.5)
+                }
+                .onSubmit {
+                    sendTextInput()
+                }
+
+            // Send button
+            Button(action: sendTextInput) {
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.gradient)
+                        .frame(width: 40, height: 40)
+                        .shadow(color: .blue.opacity(0.3), radius: 6, y: 3)
+
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .disabled(textInputContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .opacity(textInputContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1.0)
+            .buttonStyle(.plain)
+
+            // Cancel/back button
+            Button(action: {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isTextInputMode = false
+                    textInputContent = ""
+                    isTextFieldFocused = false
+                }
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func sendTextInput() {
+        let trimmed = textInputContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        #if os(iOS)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
+
+        sendTranscript(trimmed)
+
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            isTextInputMode = false
+            textInputContent = ""
+            isTextFieldFocused = false
+        }
     }
 
     @ViewBuilder
@@ -610,7 +702,7 @@ struct ChatView: View {
     private var microphonePrimaryText: String {
         switch microphoneStatus {
         case .idle:
-            return "Tap & hold to speak"
+            return "Hold to talk, Tap to type"
         case .requestingPermission:
             return "Requesting access…"
         case .recording:
