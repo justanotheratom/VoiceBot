@@ -4,9 +4,11 @@ import Foundation
 final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
     private var modelRunner: ModelRunner?
     private var currentURL: URL?
+    private var currentEntry: ModelCatalogEntry?
+    private var conversationWasCancelled = false
 
     func loadModel(at url: URL, entry: ModelCatalogEntry) async throws {
-        if currentURL == url, modelRunner != nil {
+        if currentURL == url, modelRunner != nil, !conversationWasCancelled {
             AppLogger.runtime().log(event: "leap:load:skipped", data: [
                 "reason": "alreadyLoaded"
             ])
@@ -16,9 +18,18 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
         try validateModel(at: url)
 
         do {
+            // If reloading after cancellation, log it
+            if conversationWasCancelled {
+                AppLogger.runtime().log(event: "leap:reloadAfterCancel", data: [
+                    "url": url.path
+                ])
+            }
+
             let runner = try await Leap.load(url: url)
             modelRunner = runner
             currentURL = url
+            currentEntry = entry
+            conversationWasCancelled = false
             AppLogger.runtime().log(event: "leap:load:success", data: [
                 "slug": entry.slug
             ])
@@ -33,6 +44,7 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
     func unload() async {
         modelRunner = nil
         currentURL = nil
+        conversationWasCancelled = false
     }
 
     func resetConversation() async {
@@ -45,6 +57,22 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
         tokenLimit: Int,
         onToken: @Sendable @escaping (String) async -> Void
     ) async throws {
+        // If previous stream was cancelled, reload model to reset Leap SDK state
+        if conversationWasCancelled {
+            guard let url = currentURL, let entry = currentEntry else {
+                throw ModelRuntimeError.notLoaded
+            }
+
+            AppLogger.runtime().log(event: "leap:reloadingAfterCancel", data: [
+                "url": url.path
+            ])
+
+            // Force reload to reset internal Leap SDK state
+            try await loadModel(at: url, entry: entry)
+
+            AppLogger.runtime().log(event: "leap:reloadAfterCancelComplete", data: [:])
+        }
+
         guard let runner = modelRunner else {
             throw ModelRuntimeError.notLoaded
         }
@@ -54,6 +82,8 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
         let conversation = Conversation(modelRunner: runner, history: historyMessages)
         let userMessage = ChatMessage(role: .user, content: [.text(userPrompt)])
         var generatedTokenEstimate = 0
+
+        var wasStreamCancelled = false
 
         do {
             for try await response in conversation.generateResponse(message: userMessage) {
@@ -79,9 +109,23 @@ final actor LeapRuntimeAdapter: ModelRuntimeAdapting {
                 }
             }
         } catch is CancellationError {
+            AppLogger.runtime().log(event: "leap:streamCancelled:error", data: [:])
+            wasStreamCancelled = true
             throw CancellationError()
         } catch {
             throw ModelRuntimeError.underlying(String(describing: error))
+        }
+
+        // Check if task was cancelled even if no error was thrown
+        if Task.isCancelled {
+            AppLogger.runtime().log(event: "leap:streamCancelled:taskCheck", data: [
+                "tokensGenerated": generatedTokenEstimate
+            ])
+            wasStreamCancelled = true
+        }
+
+        if wasStreamCancelled {
+            conversationWasCancelled = true
         }
     }
 

@@ -68,7 +68,7 @@ class ConversationManager {
     func addAssistantMessage(_ content: String) async {
         guard var conversation = currentConversation else { return }
         ensureSystemMessage(in: &conversation, persist: true)
-        
+
         let shouldTriggerTitle = !needsTitleGeneration && !conversation.messages.contains { $0.role == .assistant }
 
         let message = ChatMessageModel(role: .assistant, content: content)
@@ -78,9 +78,14 @@ class ConversationManager {
 
         if shouldTriggerTitle {
             needsTitleGeneration = true
-            await generateTitleIfNeeded()
+            // DISABLED: Title generation interferes with streaming when user stops mid-response
+            // TODO: Re-enable after fixing concurrent streaming issue
+            // Task.detached { @MainActor in
+            //     try? await Task.sleep(for: .seconds(0.5))
+            //     await self.generateTitleIfNeeded()
+            // }
         }
-        
+
         saveCurrentConversation()
     }
     
