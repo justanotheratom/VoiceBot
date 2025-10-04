@@ -32,6 +32,7 @@
 			membershipExceptions = (
 				Debug.xcconfig,
 				Release.xcconfig,
+				Shared.local.xcconfig,
 				Shared.xcconfig,
 				Tests.xcconfig,
 			);
@@ -166,7 +167,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1630;
-				LastUpgradeCheck = 1630;
+				LastUpgradeCheck = 1640;
 				TargetAttributes = {
 					8B41F6442DEDD0D5001A66F9 = {
 						CreatedOnToolsVersion = 16.3;

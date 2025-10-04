@@ -1,6 +1,16 @@
 import SwiftUI
+#if os(iOS)
+import AVFoundation
+import AVFAudio
+#endif
 
-@available(iOS 17.0, macOS 13.0, *)
+enum MicrophonePermissionState: Equatable {
+    case granted
+    case denied
+    case undetermined
+}
+
+@available(iOS 18.0, macOS 13.0, *)
 @MainActor
 public struct ContentView: View {
     @State private var persistence = PersistenceService()
@@ -78,7 +88,7 @@ public struct ContentView: View {
     }
 }
 
-@available(iOS 17.0, macOS 13.0, *)
+@available(iOS 18.0, macOS 13.0, *)
 @MainActor
 struct ChatView: View {
     let selected: SelectedModel
@@ -87,11 +97,12 @@ struct ChatView: View {
     let onDeleteModel: (ModelCatalogEntry) -> Void
     let persistence: PersistenceService
 
+    private enum SpeechPermissionState: Equatable { case unknown, granted, denied }
+
     @State private var runtime = ModelRuntimeService()
+    @State private var speechService = SpeechRecognitionService()
     @State private var conversationManager: ConversationManager?
     @State private var messages: [Message] = []
-    @State private var input: String = ""
-    @FocusState private var isInputFocused: Bool
     @State private var isStreaming: Bool = false
     @State private var userRequestedStop: Bool = false
     @State private var didAutoSend: Bool = false
@@ -100,12 +111,128 @@ struct ChatView: View {
     @State private var shouldScrollToBottom = false
     @State private var scrollTimer: Timer?
     @State private var showingConversationHistory = false
+    @State private var isRecording = false
+    @State private var isRequestingSpeechPermission = false
+    @State private var isTranscribingSpeech = false
+    @State private var microphoneErrorMessage: String?
+    @State private var speechPermissionState: SpeechPermissionState = .unknown
+    @State private var recordingStartTime: Date? = nil
+    @State private var hasPrefetchedSpeechPermission = false
+#if os(iOS)
+    @State private var isRequestingRecordPermission = false
+    @State private var recordPermission: MicrophonePermissionState = .undetermined
+#else
+    @State private var isRequestingRecordPermission = false
+    @State private var recordPermission: MicrophonePermissionState = .granted
+#endif
     private let storage = ModelStorageService()
     private let contextManager = ContextWindowManager()
     
-    private var canSend: Bool {
-        !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isStreaming
+    private var microphoneStatus: MicrophoneInputBar.Status {
+        if let message = microphoneErrorMessage {
+            return .error(message: message)
+        }
+        if isTranscribingSpeech {
+            return .transcribing
+        }
+        if isRecording {
+            return .recording
+        }
+        let requestingPermission = isRequestingSpeechPermission || isRequestingRecordPermission
+        if requestingPermission {
+            return .requestingPermission
+        }
+        if recordPermission == .denied {
+            return .disabled(message: "Enable microphone access in Settings")
+        }
+        switch speechPermissionState {
+        case .denied:
+            return .disabled(message: "Enable microphone & speech access in Settings")
+        case .unknown, .granted:
+            return .idle
+        }
     }
+
+    private var microphoneIsEnabled: Bool {
+        let base = !isStreaming && speechPermissionState != .denied && !isTranscribingSpeech && !isRequestingSpeechPermission
+        return base && !isRequestingRecordPermission && recordPermission == .granted
+    }
+
+    private func localeForRecognition() -> Locale {
+        Locale.current
+    }
+
+    private var microphoneFeedback: (text: String, color: Color)? {
+        switch microphoneStatus {
+        case .disabled(let message):
+            return (message, .secondary)
+        case .error(let message):
+            return (message, .orange)
+        default:
+            return nil
+        }
+    }
+
+    private func requestInitialSpeechPermissionsIfNeeded() async {
+        guard !hasPrefetchedSpeechPermission else { return }
+        hasPrefetchedSpeechPermission = true
+
+        let currentStatus = await speechService.authorizationStatus()
+        updatePermissionState(with: currentStatus)
+        microphoneErrorMessage = nil
+
+        switch currentStatus {
+        case .authorized, .denied, .restricted:
+            AppLogger.ui().log(event: "mic:permissionPrefetch", data: ["status": String(describing: currentStatus)])
+        case .notDetermined:
+            isRequestingSpeechPermission = true
+            let requestedStatus = await speechService.requestAuthorization()
+            isRequestingSpeechPermission = false
+            updatePermissionState(with: requestedStatus)
+            microphoneErrorMessage = nil
+            AppLogger.ui().log(event: "mic:permissionPrefetch", data: ["status": String(describing: requestedStatus)])
+        }
+
+        await requestRecordPermissionIfNeeded()
+    }
+
+#if os(iOS)
+    private func requestRecordPermissionIfNeeded() async {
+        let permission = AVAudioApplication.shared.recordPermission
+
+        switch permission {
+        case .granted:
+            recordPermission = .granted
+            AppLogger.ui().log(event: "mic:recordPermission", data: ["status": "granted"])
+            return
+        case .denied:
+            recordPermission = .denied
+            microphoneErrorMessage = "Enable microphone access in Settings."
+            AppLogger.ui().log(event: "mic:recordPermission", data: ["status": "denied"])
+            return
+        case .undetermined:
+            recordPermission = .undetermined
+        @unknown default:
+            recordPermission = .denied
+            microphoneErrorMessage = "Enable microphone access in Settings."
+            AppLogger.ui().log(event: "mic:recordPermission", data: ["status": "unknown"])
+            return
+        }
+
+        isRequestingRecordPermission = true
+        let granted = await withCheckedContinuation { continuation in
+            AVAudioApplication.requestRecordPermission { granted in
+                continuation.resume(returning: granted)
+            }
+        }
+        isRequestingRecordPermission = false
+        recordPermission = granted ? .granted : .denied
+        microphoneErrorMessage = granted ? nil : "Enable microphone access in Settings."
+        AppLogger.ui().log(event: "mic:recordPermission", data: ["status": granted ? "granted" : "denied"])
+    }
+#else
+    private func requestRecordPermissionIfNeeded() async {}
+#endif
     
     @ViewBuilder
     private var emptyStateView: some View {
@@ -136,9 +263,6 @@ struct ChatView: View {
         }
         .padding()
         .contentShape(Rectangle())
-        .onTapGesture {
-            isInputFocused = false
-        }
     }
     
     @ViewBuilder
@@ -153,16 +277,16 @@ struct ChatView: View {
                 GridItem(.flexible())
             ], spacing: 8) {
                 SuggestionPill(text: "Explain a concept") {
-                    input = "Can you explain quantum computing in simple terms?"
+                    sendTranscript("Can you explain quantum computing in simple terms?")
                 }
                 SuggestionPill(text: "Write code") {
-                    input = "Write a SwiftUI view that displays a list"
+                    sendTranscript("Write a SwiftUI view that displays a list")
                 }
                 SuggestionPill(text: "Creative writing") {
-                    input = "Write a short story about space exploration"
+                    sendTranscript("Write a short story about space exploration")
                 }
                 SuggestionPill(text: "Problem solving") {
-                    input = "Help me debug this Swift code"
+                    sendTranscript("Help me debug this Swift code")
                 }
             }
         }
@@ -208,9 +332,6 @@ struct ChatView: View {
                     shouldScrollToBottom = false
                 }
             }
-            .simultaneousGesture(
-                TapGesture().onEnded { isInputFocused = false }
-            )
         }
     }
     
@@ -223,9 +344,27 @@ struct ChatView: View {
                 .frame(height: 0.5)
             
             VStack(spacing: 12) {
-                HStack(alignment: .bottom, spacing: 12) {
-                    inputFieldView
-                    sendButtonView
+                HStack(alignment: .center, spacing: 12) {
+                    MicrophoneInputBar(
+                        status: microphoneStatus,
+                        isEnabled: microphoneIsEnabled
+                    ) {
+                        startRecordingFromUser()
+                    } onPressEnded: {
+                        finishRecordingFromUser()
+                    }
+
+                    if isStreaming {
+                        stopButton
+                    }
+                }
+
+                if let feedback = microphoneFeedback {
+                    Text(feedback.text)
+                        .font(.footnote)
+                        .foregroundStyle(feedback.color)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
             .padding(.horizontal, 16)
@@ -237,66 +376,22 @@ struct ChatView: View {
         }
     }
     
-    @ViewBuilder
-    private var inputFieldView: some View {
-        HStack(spacing: 12) {
-            TextField("Type your message...", text: $input, axis: .vertical)
-                .textFieldStyle(.plain)
-                .lineLimit(1...6)
-                .disabled(isStreaming)
-                .font(.body)
-                .focused($isInputFocused)
-            
-            if isStreaming {
-                ProgressView()
-                    .scaleEffect(0.8)
-                    .accessibilityIdentifier("typingIndicator")
-            }
+    private var stopButton: some View {
+        Button(action: { stopStreaming(userInitiated: true) }) {
+            Image(systemName: "stop.circle.fill")
+                .font(.system(size: 36))
+                .foregroundStyle(.red)
+                .background {
+                    Circle()
+                        .fill(.background)
+                        .stroke(.separator.opacity(0.2), lineWidth: 0)
+                }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background {
-            RoundedRectangle(cornerRadius: 24)
-                .fill(.quaternary.opacity(0.5))
-                .stroke(.separator.opacity(0.3), lineWidth: 1)
-        }
+        .accessibilityLabel("Stop response")
+        .accessibilityIdentifier("stopButton")
+        .animation(.easeInOut(duration: 0.2), value: isStreaming)
     }
-    
-    @ViewBuilder
-    private var sendButtonView: some View {
-        if isStreaming {
-            Button(action: { stopStreaming(userInitiated: true) }) {
-                Image(systemName: "stop.circle.fill")
-                    .font(.system(size: 36))
-                    .foregroundStyle(.red)
-                    .background {
-                        Circle()
-                            .fill(.background)
-                            .stroke(.separator.opacity(0.2), lineWidth: 0)
-                    }
-            }
-            .accessibilityLabel("Stop response")
-            .accessibilityIdentifier("stopButton")
-            .animation(.easeInOut(duration: 0.2), value: isStreaming)
-        } else {
-            Button(action: { send() }) {
-                Image(systemName: canSend ? "arrow.up.circle.fill" : "circle.fill")
-                    .font(.system(size: 36))
-                    .foregroundStyle(canSend ? .blue : .secondary)
-                    .symbolEffect(.bounce, value: input)
-                    .background {
-                        Circle()
-                            .fill(.background)
-                            .stroke(.separator.opacity(0.2), lineWidth: canSend ? 0 : 1)
-                    }
-            }
-            .disabled(!canSend)
-            .accessibilityLabel("Send message")
-            .accessibilityIdentifier("sendButton")
-            .animation(.easeInOut(duration: 0.2), value: canSend)
-        }
-    }
-    
+
     @ViewBuilder
     private var inputBarBackground: some View {
         Rectangle()
@@ -450,6 +545,9 @@ struct ChatView: View {
                 showingConversationHistory = false
             }
         }
+        .task {
+            await requestInitialSpeechPermissionsIfNeeded()
+        }
         .task(id: selected.slug) {
             // Load the model when selection changes
             do {
@@ -507,11 +605,165 @@ struct ChatView: View {
                 didAutoSend = true
                 let prompt = args[idx + 1]
                 await MainActor.run {
-                    input = prompt
-                    send()
+                    sendTranscript(prompt)
                 }
             }
         }
+    }
+
+    private func startRecordingFromUser() {
+        guard microphoneIsEnabled else { return }
+        microphoneErrorMessage = nil
+
+        Task { @MainActor in
+            await beginRecordingFlow()
+        }
+    }
+
+    private func finishRecordingFromUser() {
+        Task { @MainActor in
+            await completeRecordingFlow()
+        }
+    }
+
+    private func beginRecordingFlow() async {
+        if isStreaming || isRecording || isTranscribingSpeech {
+            return
+        }
+
+#if os(iOS)
+        if recordPermission == .undetermined && !isRequestingRecordPermission {
+            await requestRecordPermissionIfNeeded()
+        }
+        guard recordPermission == .granted else {
+            microphoneErrorMessage = "Enable microphone access in Settings."
+            AppLogger.ui().log(event: "mic:record:permissionDenied", data: ["type": "record"])
+            return
+        }
+#endif
+
+        recordingStartTime = nil
+        let status = await speechService.authorizationStatus()
+        updatePermissionState(with: status)
+
+        if speechPermissionState == .unknown {
+            isRequestingSpeechPermission = true
+            let requestedStatus = await speechService.requestAuthorization()
+            isRequestingSpeechPermission = false
+            updatePermissionState(with: requestedStatus)
+        }
+
+        guard speechPermissionState == .granted else {
+            microphoneErrorMessage = "Microphone access is required to capture your voice."
+            AppLogger.ui().log(event: "mic:permissionDenied", data: ["state": String(describing: speechPermissionState)])
+            return
+        }
+
+        do {
+            try await speechService.start(locale: localeForRecognition())
+            isRecording = true
+            microphoneErrorMessage = nil
+            recordingStartTime = Date()
+            AppLogger.ui().log(event: "mic:record:start", data: ["model": selected.slug])
+        } catch {
+            isRecording = false
+            await handleSpeechRecognitionError(error)
+        }
+    }
+
+    private func completeRecordingFlow() async {
+        if isRequestingSpeechPermission {
+            isRequestingSpeechPermission = false
+            if speechPermissionState != .granted {
+                microphoneErrorMessage = "Enable microphone & speech recognition in Settings to use voice input."
+                return
+            }
+        }
+
+        guard isRecording else { return }
+
+        isRecording = false
+        isTranscribingSpeech = true
+
+        do {
+            let transcript = try await speechService.stop()
+            isTranscribingSpeech = false
+
+            let elapsedMs: Int?
+            if let start = recordingStartTime {
+                let duration = Date().timeIntervalSince(start)
+                elapsedMs = Int(duration * 1000)
+                if duration < 0.5 {
+                    recordingStartTime = nil
+                    microphoneErrorMessage = "Hold the microphone a bit longer."
+                    AppLogger.ui().log(event: "mic:record:tooShort", data: ["durationMs": elapsedMs ?? 0])
+                    return
+                }
+            } else {
+                elapsedMs = nil
+            }
+
+            recordingStartTime = nil
+
+            let cleaned = transcript?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !cleaned.isEmpty else {
+                microphoneErrorMessage = "I didn't catch that. Try speaking again."
+                AppLogger.ui().log(event: "mic:record:empty", data: [:])
+                return
+            }
+
+            microphoneErrorMessage = nil
+            AppLogger.ui().log(event: "mic:record:transcript", data: [
+                "characters": cleaned.count,
+                "durationMs": elapsedMs ?? -1
+            ])
+            sendTranscript(cleaned)
+        } catch {
+            isTranscribingSpeech = false
+            await handleSpeechRecognitionError(error)
+        }
+    }
+
+    private func updatePermissionState(with status: SpeechRecognitionService.AuthorizationStatus) {
+        switch status {
+        case .authorized:
+            speechPermissionState = .granted
+        case .denied, .restricted:
+            speechPermissionState = .denied
+        case .notDetermined:
+            speechPermissionState = .unknown
+        }
+    }
+
+    private func handleSpeechRecognitionError(_ error: Error) async {
+        recordingStartTime = nil
+        if let serviceError = error as? SpeechRecognitionService.ServiceError {
+            switch serviceError {
+            case .authorizationDenied:
+                speechPermissionState = .denied
+                microphoneErrorMessage = "Microphone access is required to capture your voice."
+            case .onDeviceRecognitionUnsupported:
+                microphoneErrorMessage = "On-device speech recognition isn't supported on this device."
+            case .recognizerUnavailable:
+                microphoneErrorMessage = "Speech recognizer is currently unavailable."
+            case .audioEngineUnavailable:
+                microphoneErrorMessage = "Couldn't access the microphone. Please try again."
+            case .recognitionFailed(let message):
+                microphoneErrorMessage = message
+            case .recognitionAlreadyRunning:
+                microphoneErrorMessage = "A recording session is already active."
+            case .noActiveRecognition:
+                microphoneErrorMessage = "No recording session to finish."
+            }
+            AppLogger.ui().logError(event: "mic:record:error", error: serviceError)
+        } else {
+            microphoneErrorMessage = error.localizedDescription
+            AppLogger.ui().logError(event: "mic:record:error", error: error)
+        }
+
+        await speechService.cancel()
+        isRecording = false
+        isTranscribingSpeech = false
     }
 
     private func stopStreaming(userInitiated: Bool) {
@@ -528,14 +780,13 @@ struct ChatView: View {
         isStreaming = false
     }
 
-    private func send() {
-        let prompt = input.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func sendTranscript(_ rawPrompt: String) {
+        let prompt = rawPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty else { return }
 
         stopStreaming(userInitiated: false)
         
         withAnimation(.easeInOut(duration: 0.2)) {
-            input = ""
             messages.append(Message(role: .user, text: prompt))
             messages.append(Message(role: .assistant, text: ""))
         }
