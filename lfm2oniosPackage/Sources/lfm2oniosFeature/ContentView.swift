@@ -416,11 +416,7 @@ struct ChatView: View {
     @ViewBuilder
     private var inputBarView: some View {
         VStack(spacing: 0) {
-            // Subtle top divider
-            Divider()
-                .opacity(0.5)
-
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 // Compact microphone button with state-aware design
                 microphoneButton
 
@@ -430,8 +426,8 @@ struct ChatView: View {
                         .transition(.scale.combined(with: .opacity))
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .background {
                 inputBarBackground
                     .ignoresSafeArea(edges: .bottom)
@@ -463,58 +459,59 @@ struct ChatView: View {
                 finishRecordingFromUser()
             }
 
-        HStack(spacing: 12) {
-            // Icon with pulsing animation during recording
-            microphoneIcon
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(microphoneIconColor)
-                .frame(width: 44, height: 44)
-                .background {
-                    Circle()
-                        .fill(microphoneBackgroundColor)
-                }
-                .overlay {
-                    if case .recording = microphoneStatus {
-                        Circle()
-                            .stroke(Color.red.opacity(0.5), lineWidth: 2)
-                            .scaleEffect(1.2)
-                            .opacity(0.8)
-                            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: microphoneStatus)
-                    }
-                }
+        HStack(spacing: 14) {
+            // Icon with elegant styling
+            ZStack {
+                Circle()
+                    .fill(microphoneBackgroundColor.gradient)
+                    .frame(width: 52, height: 52)
+                    .shadow(color: microphoneBackgroundColor.opacity(0.3), radius: 8, y: 4)
 
-            // Compact text - single line with dynamic content
-            VStack(alignment: .leading, spacing: 2) {
+                microphoneIcon
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(.white)
+                    .symbolEffect(.pulse, options: .repeating, isActive: microphoneStatus == .recording)
+            }
+
+            // Text content with better typography
+            VStack(alignment: .leading, spacing: 3) {
                 Text(microphonePrimaryText)
-                    .font(.subheadline.weight(.medium))
+                    .font(.body.weight(.medium))
                     .foregroundStyle(microphonePrimaryColor)
 
                 if let detail = microphoneDetailText {
                     Text(detail)
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
 
             Spacer(minLength: 0)
 
-            // Progress indicator for permission/transcription states
+            // Progress indicator
             if microphoneShowsProgress {
                 ProgressView()
-                    .controlSize(.small)
-                    .tint(.blue)
+                    .controlSize(.regular)
+                    .tint(microphoneBackgroundColor)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
         .background {
-            microphoneContainerBackground
+            RoundedRectangle(cornerRadius: 28)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 24))
-        .opacity(microphoneIsEnabled ? 1.0 : 0.6)
+        .overlay {
+            RoundedRectangle(cornerRadius: 28)
+                .strokeBorder(.quaternary, lineWidth: 0.5)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 28))
+        .scaleEffect(microphoneStatus == .recording ? 1.02 : 1.0)
+        .opacity(microphoneIsEnabled ? 1.0 : 0.5)
         .gesture(gesture)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: microphoneStatus)
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: microphoneStatus)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(microphoneAccessibilityLabel)
         .accessibilityHint(microphoneAccessibilityHint)
@@ -523,21 +520,25 @@ struct ChatView: View {
 
     @ViewBuilder
     private func statusBanner(text: String, color: Color) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundStyle(color)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(color.opacity(0.3), lineWidth: 1)
-                    }
-            }
-            .offset(y: -8)
-            .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.caption)
+            Text(text)
+                .font(.caption.weight(.medium))
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background {
+            Capsule()
+                .fill(.thinMaterial)
+                .overlay {
+                    Capsule()
+                        .strokeBorder(color.opacity(0.2), lineWidth: 0.5)
+                }
+        }
+        .offset(y: -10)
+        .shadow(color: color.opacity(0.15), radius: 6, y: 3)
     }
 
     // MARK: - Microphone Button Helpers
@@ -579,17 +580,17 @@ struct ChatView: View {
     private var microphoneBackgroundColor: Color {
         switch microphoneStatus {
         case .idle:
-            return .blue
+            return Color.blue
         case .requestingPermission:
-            return .blue
+            return Color.indigo
         case .recording:
-            return .red
+            return Color.red
         case .transcribing:
-            return .blue
+            return Color.purple
         case .disabled:
-            return .gray
+            return Color.gray
         case .error:
-            return .orange
+            return Color.orange
         }
     }
 
@@ -649,16 +650,6 @@ struct ChatView: View {
         }
     }
 
-    private var microphoneContainerBackground: some View {
-        RoundedRectangle(cornerRadius: 24)
-            .fill(.ultraThickMaterial)
-            .overlay {
-                RoundedRectangle(cornerRadius: 24)
-                    .strokeBorder(.separator.opacity(0.5), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
-    }
-
     private var microphoneAccessibilityLabel: String {
         switch microphoneStatus {
         case .idle:
@@ -695,31 +686,36 @@ struct ChatView: View {
     
     private var stopButton: some View {
         Button(action: { stopStreaming(userInitiated: true) }) {
-            Image(systemName: "stop.circle.fill")
-                .font(.system(size: 36))
-                .foregroundStyle(.red)
-                .background {
-                    Circle()
-                        .fill(.background)
-                        .stroke(.separator.opacity(0.2), lineWidth: 0)
-                }
+            ZStack {
+                Circle()
+                    .fill(.red.gradient)
+                    .frame(width: 52, height: 52)
+                    .shadow(color: .red.opacity(0.3), radius: 8, y: 4)
+
+                Image(systemName: "stop.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
         }
         .accessibilityLabel("Stop response")
         .accessibilityIdentifier("stopButton")
-        .animation(.easeInOut(duration: 0.2), value: isStreaming)
+        .buttonStyle(.plain)
+        .scaleEffect(1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isStreaming)
     }
 
     @ViewBuilder
     private var inputBarBackground: some View {
         Rectangle()
-            .fill(.thinMaterial)
+            .fill(.regularMaterial)
             .background {
                 LinearGradient(
-                    colors: [.clear, .black.opacity(0.03)],
+                    colors: [Color.black.opacity(0.01), Color.black.opacity(0.04)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             }
+            .shadow(color: .black.opacity(0.06), radius: 1, y: -1)
     }
 
     var body: some View {
