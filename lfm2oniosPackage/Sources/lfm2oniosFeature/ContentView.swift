@@ -234,13 +234,14 @@ struct ChatView: View {
         await MainActor.run {
             isRequestingRecordPermission = true
         }
-        let granted = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-            Task { @MainActor in
-                AVAudioApplication.requestRecordPermission { granted in
-                    continuation.resume(returning: granted)
-                }
+
+        // Note: AVAudioApplication.requestRecordPermission completion runs on background queue
+        let granted: Bool = await withCheckedContinuation { continuation in
+            AVAudioApplication.requestRecordPermission { granted in
+                continuation.resume(returning: granted)
             }
         }
+
         await MainActor.run {
             isRequestingRecordPermission = false
             recordPermission = granted ? .granted : .denied
