@@ -4,22 +4,21 @@ import os.log
 /// Actor to safely accumulate title tokens from the streaming response
 private actor TitleAccumulator {
     private var title: String = ""
-    
+
     func append(_ token: String) {
         title += token
     }
-    
+
     func getTitle() -> String {
         return title
     }
 }
 
-@Observable
-@MainActor
-class TitleGenerationService {
+/// Actor service for generating conversation titles using LLM
+actor TitleGenerationService {
     private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "title")
     private let modelRuntimeService: ModelRuntimeService
-    
+
     init(modelRuntimeService: ModelRuntimeService) {
         self.modelRuntimeService = modelRuntimeService
     }
@@ -38,26 +37,26 @@ class TitleGenerationService {
         
         do {
             logger.info("title: { event: \"generateStart\", conversationId: \"\(conversation.id)\" }")
-            
+
             // Check if model is loaded
             guard await modelRuntimeService.isModelLoaded else {
                 logger.warning("title: { event: \"generateSkipped\", reason: \"modelNotLoaded\" }")
                 return fallbackTitle()
             }
-            
-            // Use an actor to safely accumulate the title tokens
-            let titleAccumulator = TitleAccumulator()
-            
+
+            // Accumulate title tokens using an actor
+            let accumulator = TitleAccumulator()
+
             // Use the existing streamResponse method to generate title
             try await modelRuntimeService.streamResponse(
                 prompt: prompt,
                 conversation: [],
                 tokenLimit: 64
             ) { token in
-                await titleAccumulator.append(token)
+                await accumulator.append(token)
             }
-            
-            let generatedTitle = await titleAccumulator.getTitle()
+
+            let generatedTitle = await accumulator.getTitle()
             
             let cleanTitle = cleanTitleText(generatedTitle)
             logger.info("title: { event: \"generated\", title: \"\(cleanTitle)\" }")

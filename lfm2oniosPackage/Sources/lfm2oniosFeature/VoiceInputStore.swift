@@ -6,19 +6,18 @@ import AVFoundation
 import AVFAudio
 #endif
 
+/// Store managing voice input UI state and coordinating with SpeechRecognitionService
 @available(iOS 18.0, macOS 13.0, *)
 @MainActor
 @Observable
-final class VoiceInputController {
+final class VoiceInputStore {
     enum SpeechPermissionState: Equatable {
         case unknown
         case granted
         case denied
     }
 
-    private let speechService: SpeechRecognitionService
-    @ObservationIgnored private var errorDismissTask: Task<Void, Never>?
-    @ObservationIgnored private var transcriptHandler: ((String) -> Void)?
+    // MARK: - Published State (UI-observable)
 
     var isRecording = false
     var isRequestingSpeechPermission = false
@@ -36,6 +35,14 @@ final class VoiceInputController {
 
     var recordingStartTime: Date?
 
+    // MARK: - Dependencies (not published)
+
+    @ObservationIgnored private let speechService: SpeechRecognitionService
+    @ObservationIgnored private var errorDismissTask: Task<Void, Never>?
+    @ObservationIgnored private var transcriptHandler: ((String) -> Void)?
+
+    // MARK: - Initialization
+
     init(speechService: SpeechRecognitionService = SpeechRecognitionService()) {
         self.speechService = speechService
     }
@@ -43,6 +50,8 @@ final class VoiceInputController {
     deinit {
         errorDismissTask?.cancel()
     }
+
+    // MARK: - Computed UI Properties
 
     var status: MicrophoneInputBar.Status {
         if let message = microphoneErrorMessage {
@@ -83,6 +92,8 @@ final class VoiceInputController {
             return nil
         }
     }
+
+    // MARK: - Actions
 
     func prefetchPermissionsIfNeeded() async {
         guard !hasPrefetchedSpeechPermission else { return }
@@ -224,6 +235,8 @@ final class VoiceInputController {
         isTranscribing = false
     }
 
+    // MARK: - Error Handling
+
     func clearMicrophoneError() {
         errorDismissTask?.cancel()
         microphoneErrorMessage = nil
@@ -243,6 +256,8 @@ final class VoiceInputController {
             }
         }
     }
+
+    // MARK: - Private Helpers
 
     private func updatePermissionState(with status: SpeechRecognitionService.AuthorizationStatus) {
         switch status {
@@ -332,7 +347,7 @@ final class VoiceInputController {
 
 @available(iOS 18.0, macOS 13.0, *)
 struct VoiceInputBar: View {
-    @Bindable var controller: VoiceInputController
+    @Bindable var controller: VoiceInputStore
     let isStreaming: Bool
     let modelSlug: String
     let onSendText: (String) -> Void

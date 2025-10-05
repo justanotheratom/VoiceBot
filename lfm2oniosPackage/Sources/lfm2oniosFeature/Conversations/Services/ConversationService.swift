@@ -1,36 +1,26 @@
 import Foundation
 import os.log
 
-@Observable
-class ConversationService {
+/// Stateless service for conversation file persistence
+struct ConversationService: Sendable {
     private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "conversation")
-    private let conversationsDirectory: URL
-    
-    init() {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, 
-                                                in: .userDomainMask).first!
-        conversationsDirectory = appSupport.appendingPathComponent("Conversations")
-        createConversationsDirectoryIfNeeded()
-    }
-    
-    private func createConversationsDirectoryIfNeeded() {
-        if !FileManager.default.fileExists(atPath: conversationsDirectory.path) {
-            try? FileManager.default.createDirectory(at: conversationsDirectory, 
-                                                   withIntermediateDirectories: true)
-        }
-    }
-    
+
+    init() {}
+
     // MARK: - Persistence
-    
+
     func saveConversation(_ conversation: ChatConversation) throws {
-        let fileURL = conversationFileURL(for: conversation.id)
+        let conversationsDirectory = Self.conversationsDirectory()
+        Self.createConversationsDirectoryIfNeeded(at: conversationsDirectory)
+        let fileURL = Self.conversationFileURL(for: conversation.id, in: conversationsDirectory)
         let data = try JSONEncoder().encode(conversation)
         try data.write(to: fileURL)
         logger.info("conversation: { event: \"saved\", id: \"\(conversation.id)\", messageCount: \(conversation.messages.count) }")
     }
     
     func loadConversation(id: UUID) throws -> ChatConversation {
-        let fileURL = conversationFileURL(for: id)
+        let conversationsDirectory = Self.conversationsDirectory()
+        let fileURL = Self.conversationFileURL(for: id, in: conversationsDirectory)
         let data = try Data(contentsOf: fileURL)
         let conversation = try JSONDecoder().decode(ChatConversation.self, from: data)
         logger.info("conversation: { event: \"loaded\", id: \"\(id)\", messageCount: \(conversation.messages.count) }")
@@ -38,6 +28,9 @@ class ConversationService {
     }
     
     func loadAllConversations() -> [ChatConversation] {
+        let conversationsDirectory = Self.conversationsDirectory()
+        Self.createConversationsDirectoryIfNeeded(at: conversationsDirectory)
+
         do {
             let fileURLs = try FileManager.default.contentsOfDirectory(
                 at: conversationsDirectory,
@@ -58,12 +51,28 @@ class ConversationService {
     }
     
     func deleteConversation(id: UUID) throws {
-        let fileURL = conversationFileURL(for: id)
+        let conversationsDirectory = Self.conversationsDirectory()
+        let fileURL = Self.conversationFileURL(for: id, in: conversationsDirectory)
         try FileManager.default.removeItem(at: fileURL)
         logger.info("conversation: { event: \"deleted\", id: \"\(id)\" }")
     }
-    
-    private func conversationFileURL(for id: UUID) -> URL {
-        conversationsDirectory.appendingPathComponent("\(id.uuidString).json")
+
+    // MARK: - Private Helpers
+
+    private static func conversationsDirectory() -> URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory,
+                                                   in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("Conversations")
+    }
+
+    private static func createConversationsDirectoryIfNeeded(at directory: URL) {
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            try? FileManager.default.createDirectory(at: directory,
+                                                     withIntermediateDirectories: true)
+        }
+    }
+
+    private static func conversationFileURL(for id: UUID, in directory: URL) -> URL {
+        directory.appendingPathComponent("\(id.uuidString).json")
     }
 }

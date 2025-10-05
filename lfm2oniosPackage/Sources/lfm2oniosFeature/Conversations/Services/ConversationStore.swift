@@ -1,22 +1,31 @@
 import Foundation
 import os.log
 
+/// Store managing conversation UI state and coordinating persistence
 @Observable
 @MainActor
-class ConversationManager {
-    private let conversationService = ConversationService()
-    private let contextManager = ContextWindowManager()
-    private let titleService: TitleGenerationService
-    private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "conversation")
-    private var activeModelSlug: String?
-    
+final class ConversationStore {
+    // MARK: - Published State (UI-observable)
+
     var currentConversation: ChatConversation?
     var needsTitleGeneration = false
-    
+
+    // MARK: - Dependencies (not published)
+
+    @ObservationIgnored private let conversationService = ConversationService()
+    @ObservationIgnored private let contextManager = ContextWindowManager()
+    @ObservationIgnored private let titleService: TitleGenerationService
+    @ObservationIgnored private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "conversation")
+    @ObservationIgnored private var activeModelSlug: String?
+
+    // MARK: - Initialization
+
     init(modelRuntimeService: ModelRuntimeService) {
         self.titleService = TitleGenerationService(modelRuntimeService: modelRuntimeService)
     }
-    
+
+    // MARK: - Actions
+
     func startNewConversation(modelSlug: String) {
         activeModelSlug = modelSlug
         var conversation = ChatConversation(modelSlug: modelSlug, initialMessages: [])
@@ -99,7 +108,9 @@ class ConversationManager {
         // Return all messages (archived + active) for UI display
         return currentConversation?.allMessages ?? []
     }
-    
+
+    // MARK: - Private Helpers
+
     private func saveCurrentConversation() {
         guard let conversation = currentConversation else { return }
         

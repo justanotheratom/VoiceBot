@@ -94,8 +94,8 @@ struct ChatView: View {
     let persistence: PersistenceService
 
     @State private var runtime = ModelRuntimeService()
-    @State private var voiceInputController = VoiceInputController()
-    @State private var conversationManager: ConversationManager?
+    @State private var voiceInputStore = VoiceInputStore()
+    @State private var conversationStore: ConversationStore?
     @State private var messages: [Message] = []
     @State private var isStreaming: Bool = false
     @State private var userRequestedStop: Bool = false
@@ -206,7 +206,7 @@ struct ChatView: View {
             VStack(spacing: 0) {
                 Spacer()
                 VoiceInputBar(
-                    controller: voiceInputController,
+                    controller: voiceInputStore,
                     isStreaming: isStreaming,
                     modelSlug: selected.slug,
                     onSendText: sendTranscript,
@@ -282,7 +282,7 @@ struct ChatView: View {
                     }
 
                     // Start a new conversation
-                    conversationManager?.startNewConversation(modelSlug: selected.slug)
+                    conversationStore?.startNewConversation(modelSlug: selected.slug)
                 }) {
                     Image(systemName: "plus.message")
                         .font(.body)
@@ -340,7 +340,7 @@ struct ChatView: View {
             }
         }
         .task {
-            await voiceInputController.prefetchPermissionsIfNeeded()
+            await voiceInputStore.prefetchPermissionsIfNeeded()
         }
         .task(id: selected.slug) {
             // Load the model when selection changes
@@ -384,9 +384,9 @@ struct ChatView: View {
                 try await runtime.loadModel(entry: entry, at: urlToLoad)
                 AppLogger.runtime().log(event: "load:success", data: ["slug": selected.slug])
 
-                // Initialize conversation manager after successful model load
-                conversationManager = ConversationManager(modelRuntimeService: runtime)
-                conversationManager?.startNewConversation(modelSlug: selected.slug)
+                // Initialize conversation store after successful model load
+                conversationStore = ConversationStore(modelRuntimeService: runtime)
+                conversationStore?.startNewConversation(modelSlug: selected.slug)
             } catch {
                 AppLogger.runtime().logError(event: "load:failed", error: error, data: ["slug": selected.slug])
                 // Show error to user - no fallback to simulation
@@ -448,7 +448,7 @@ struct ChatView: View {
         }
 
         // Add user message to conversation manager
-        conversationManager?.addUserMessage(prompt)
+        conversationStore?.addUserMessage(prompt)
 
         let assistantIndex = messages.count - 1
         isStreaming = true
@@ -472,7 +472,7 @@ struct ChatView: View {
             var tokenCount = 0
 
             do {
-                let llmMessages = conversationManager?.getMessagesForLLM() ?? []
+                let llmMessages = conversationStore?.getMessagesForLLM() ?? []
 
                 try await runtime.streamResponse(
                     prompt: prompt,
@@ -511,7 +511,7 @@ struct ChatView: View {
                     // Add assistant response to conversation manager
                     let assistantResponse = messages[assistantIndex].text
                     Task { @MainActor in
-                        await conversationManager?.addAssistantMessage(assistantResponse)
+                        await conversationStore?.addAssistantMessage(assistantResponse)
                     }
                     userRequestedStop = false
                 }
@@ -521,7 +521,7 @@ struct ChatView: View {
                     let partialResponse = messages[assistantIndex].text
                     if !partialResponse.isEmpty, userRequestedStop {
                         Task { @MainActor in
-                            await conversationManager?.addAssistantMessage(partialResponse)
+                            await conversationStore?.addAssistantMessage(partialResponse)
                         }
                     }
                 }
@@ -548,10 +548,10 @@ struct ChatView: View {
         messages.removeAll()
         
         // Load conversation in manager
-        conversationManager?.loadConversation(conversation)
+        conversationStore?.loadConversation(conversation)
         
         // Convert ChatMessageModel to UI Message format and display
-        let conversationMessages = conversationManager?.getAllMessagesForDisplay() ?? []
+        let conversationMessages = conversationStore?.getAllMessagesForDisplay() ?? []
         messages = conversationMessages.compactMap { chatMessage in
             switch chatMessage.role {
             case .user:
