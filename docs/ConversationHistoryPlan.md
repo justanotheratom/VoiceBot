@@ -34,7 +34,7 @@ This document outlines the implementation of a conversation history feature for 
 
 ### File Structure to Create
 ```
-lfm2oniosPackage/Sources/lfm2oniosFeature/Conversations/
+VoiceBotPackage/Sources/VoiceBotFeature/Conversations/
 ├── Models/
 │   ├── Conversation.swift
 │   ├── ChatMessage.swift
@@ -133,7 +133,7 @@ import os.log
 
 @Observable
 class ConversationService {
-    private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "conversation")
+    private let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "conversation")
     private let conversationsDirectory: URL
     
     init() {
@@ -200,10 +200,10 @@ class ConversationService {
 ```
 
 #### ✅ Add Unit Tests
-Added tests to `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/lfm2oniosFeatureTests.swift`:
+Added tests to `VoiceBotPackage/Tests/VoiceBotFeatureTests/VoiceBotFeatureTests.swift`:
 ```swift
 import Testing
-@testable import lfm2oniosFeature
+@testable import VoiceBotFeature
 
 @Test func conversationPersistence() async throws {
     let service = ConversationService()
@@ -246,7 +246,7 @@ import Foundation
 import os.log
 
 struct ContextWindowManager {
-    private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "context")
+    private let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "context")
     
     // Model context limits (in tokens)
     private let modelContextLimits: [String: Int] = [
@@ -371,7 +371,7 @@ import os.log
 
 @Observable
 class TitleGenerationService {
-    private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "title")
+    private let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "title")
     private let modelRuntimeService: ModelRuntimeService
     
     init(modelRuntimeService: ModelRuntimeService) {
@@ -485,7 +485,7 @@ class TitleGenerationService {
 
 ### Files Created
 ```
-lfm2oniosPackage/Sources/lfm2oniosFeature/Conversations/Views/
+VoiceBotPackage/Sources/VoiceBotFeature/Conversations/Views/
 ├── ConversationListView.swift ✅
 ├── ConversationRow.swift ✅
 └── ConversationSearchView.swift (functionality integrated into ConversationListView)
@@ -557,7 +557,7 @@ struct ConversationListView: View {
     @State private var conversations: [Conversation] = []
     @State private var searchText = ""
     
-    private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "ui")
+    private let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "ui")
     
     let onConversationSelected: (Conversation) -> Void
     
@@ -682,7 +682,7 @@ class ConversationManager {
     private let conversationService = ConversationService()
     private let contextManager = ContextWindowManager()
     private let titleService: TitleGenerationService
-    private let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "conversation")
+    private let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "conversation")
     
     var currentConversation: Conversation?
     var needsTitleGeneration = false
@@ -863,7 +863,7 @@ func loadConversation(_ conversation: Conversation) {
 After implementation, your file structure should look like:
 
 ```
-lfm2oniosPackage/Sources/lfm2oniosFeature/
+VoiceBotPackage/Sources/VoiceBotFeature/
 ├── Conversations/
 │   ├── Models/
 │   │   ├── Conversation.swift
@@ -885,7 +885,7 @@ lfm2oniosPackage/Sources/lfm2oniosFeature/
 
 ## Testing Strategy
 
-Create comprehensive tests in `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/`:
+Create comprehensive tests in `VoiceBotPackage/Tests/VoiceBotFeatureTests/`:
 - `ConversationServiceTests.swift`
 - `ContextWindowManagerTests.swift`
 - `TitleGenerationServiceTests.swift`

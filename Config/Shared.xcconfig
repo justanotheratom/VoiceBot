@@ -8,9 +8,9 @@
 // ==========================================
 // Project Identity
 // ==========================================
-PRODUCT_NAME = lfm2onios
-PRODUCT_DISPLAY_NAME = lfm2
-PRODUCT_BUNDLE_IDENTIFIER = com.oneoffrepo.lfm2onios
+PRODUCT_NAME = VoiceBot
+PRODUCT_DISPLAY_NAME = VoiceBot
+PRODUCT_BUNDLE_IDENTIFIER = com.oneoffrepo.voicebot
 MARKETING_VERSION = 1.0
 CURRENT_PROJECT_VERSION = 1
 
@@ -40,5 +40,5 @@ INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = Speech recognition converts 
 // ==========================================
 // Entitlements
 // ==========================================
-// AI agents can modify Config/lfm2onios.entitlements to add capabilities
-CODE_SIGN_ENTITLEMENTS = Config/lfm2onios.entitlements
+// AI agents can modify Config/VoiceBot.entitlements to add capabilities
+CODE_SIGN_ENTITLEMENTS = Config/VoiceBot.entitlements

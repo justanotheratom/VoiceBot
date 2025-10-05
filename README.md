@@ -1,4 +1,4 @@
-# lfm2onios - iOS App
+# VoiceBot - iOS App
 
 A modern iOS application using a **workspace + SPM package** architecture for clean separation between app shell and feature code.
 
@@ -31,25 +31,25 @@ These rules files are **starting points** - feel free to:
 ## Project Architecture
 
 ```
-lfm2onios/
-├── lfm2onios.xcworkspace/              # Open this file in Xcode
-├── lfm2onios.xcodeproj/                # App shell project
-├── lfm2onios/                          # App target (minimal)
+VoiceBot/
+├── VoiceBot.xcworkspace/              # Open this file in Xcode
+├── VoiceBot.xcodeproj/                # App shell project
+├── VoiceBot/                          # App target (minimal)
 │   ├── Assets.xcassets/                # App-level assets (icons, colors)
-│   ├── lfm2oniosApp.swift              # App entry point
-│   └── lfm2onios.xctestplan            # Test configuration
-├── lfm2oniosPackage/                   # 🚀 Primary development area
+│   ├── VoiceBotApp.swift              # App entry point
+│   └── VoiceBot.xctestplan            # Test configuration
+├── VoiceBotPackage/                   # 🚀 Primary development area
 │   ├── Package.swift                   # Package configuration
-│   ├── Sources/lfm2oniosFeature/       # Your feature code
-│   └── Tests/lfm2oniosFeatureTests/    # Unit tests
-└── lfm2oniosUITests/                   # UI automation tests
+│   ├── Sources/VoiceBotFeature/       # Your feature code
+│   └── Tests/VoiceBotFeatureTests/    # Unit tests
+└── VoiceBotUITests/                   # UI automation tests
 ```
 
 ## Key Architecture Points
 
 ### Workspace + SPM Structure
-- **App Shell**: `lfm2onios/` contains minimal app lifecycle code
-- **Feature Code**: `lfm2oniosPackage/Sources/lfm2oniosFeature/` is where most development happens
+- **App Shell**: `VoiceBot/` contains minimal app lifecycle code
+- **Feature Code**: `VoiceBotPackage/Sources/VoiceBotFeature/` is where most development happens
 - **Separation**: Business logic lives in the SPM package, app target just imports and displays it
 
 ### Buildable Folders (Xcode 16)
@@ -61,26 +61,26 @@ lfm2onios/
 
 ### Quick Setup
 1. **Prerequisites**: Xcode 15+, iOS 17.2+ simulator, macOS 13+
-2. **Open Project**: `lfm2onios.xcworkspace` (NOT the `.xcodeproj` file)
-3. **Build & Run**: Select "lfm2onios" scheme, choose iPhone 16 simulator, press ⌘R
+2. **Open Project**: `VoiceBot.xcworkspace` (NOT the `.xcodeproj` file)
+3. **Build & Run**: Select "VoiceBot" scheme, choose iPhone 16 simulator, press ⌘R
 4. **First Launch**: App will show model selection - tap "Download" on LFM2 350M model
 
 ### Development Workflow
 ```bash
 # Build and test
-xcodebuild -workspace lfm2onios.xcworkspace -scheme lfm2onios -destination 'name=iPhone 16' build test
+xcodebuild -workspace VoiceBot.xcworkspace -scheme VoiceBot -destination 'name=iPhone 16' build test
 
 # Or use XcodeBuildMCP tools for AI-assisted development
 # See CLAUDE.md for XcodeBuildMCP command reference
 ```
 
 ### Key Files for New Engineers
-- **Entry Point**: `lfm2onios/lfm2oniosApp.swift` - App lifecycle and automation hooks
-- **Main View**: `lfm2oniosPackage/Sources/lfm2oniosFeature/ContentView.swift` - Root SwiftUI view
+- **Entry Point**: `VoiceBot/VoiceBotApp.swift` - App lifecycle and automation hooks
+- **Main View**: `VoiceBotPackage/Sources/VoiceBotFeature/ContentView.swift` - Root SwiftUI view
 - **Chat Interface**: Same file, `ChatView` struct - Main chat UI with model integration
 - **Settings**: `SettingsView.swift` - Model management interface
 - **Services**: All `*Service.swift` files - Core business logic (download, storage, runtime, persistence)
-- **Tests**: `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/lfm2oniosFeatureTests.swift` - Unit tests
+- **Tests**: `VoiceBotPackage/Tests/VoiceBotFeatureTests/VoiceBotFeatureTests.swift` - Unit tests
 
 ### Architecture Overview for New Engineers
 ```
@@ -94,15 +94,15 @@ User Interaction Flow:
 
 ### Common Development Tasks
 - **Add new model**: Update `ModelCatalog.swift` with model metadata
-- **Modify UI**: Edit SwiftUI files in `lfm2oniosPackage/Sources/lfm2oniosFeature/`
-- **Add dependencies**: Edit `lfm2oniosPackage/Package.swift`
+- **Modify UI**: Edit SwiftUI files in `VoiceBotPackage/Sources/VoiceBotFeature/`
+- **Add dependencies**: Edit `VoiceBotPackage/Package.swift`
 - **Logging**: Use print statements with structured JSON format (see existing examples)
-- **Testing**: Add tests to `lfm2oniosFeatureTests.swift` using Swift Testing framework
+- **Testing**: Add tests to `VoiceBotFeatureTests.swift` using Swift Testing framework
 
 ## Development Notes
 
 ### Code Organization
-Most development happens in `lfm2oniosPackage/Sources/lfm2oniosFeature/` - organize your code as you prefer.
+Most development happens in `VoiceBotPackage/Sources/VoiceBotFeature/` - organize your code as you prefer.
 
 ### Public API Requirements
 Types exposed to the app target need `public` access:
@@ -117,14 +117,14 @@ public struct NewView: View {
 ```
 
 ### Adding Dependencies
-Edit `lfm2oniosPackage/Package.swift` to add SPM dependencies:
+Edit `VoiceBotPackage/Package.swift` to add SPM dependencies:
 ```swift
 dependencies: [
     .package(url: "https://github.com/example/SomePackage", from: "1.0.0")
 ],
 targets: [
     .target(
-        name: "lfm2oniosFeature",
+        name: "VoiceBotFeature",
         dependencies: ["SomePackage"]
     ),
 ]
@@ -235,9 +235,9 @@ The app uses a simplified, card-based interface for model management:
 - `ModelSelectionView`: First-run model selection (legacy, used for initial setup)
 
 ### Test Structure
-- **Unit Tests**: `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/` (Swift Testing framework)
-- **UI Tests**: `lfm2oniosUITests/` (XCUITest framework)
-- **Test Plan**: `lfm2onios.xctestplan` coordinates all tests
+- **Unit Tests**: `VoiceBotPackage/Tests/VoiceBotFeatureTests/` (Swift Testing framework)
+- **UI Tests**: `VoiceBotUITests/` (XCUITest framework)
+- **Test Plan**: `VoiceBot.xctestplan` coordinates all tests
 
 ## Configuration
 
@@ -250,19 +250,19 @@ Build settings are managed through **XCConfig files** in `Config/`:
 
 ### Entitlements Management
 App capabilities are managed through a **declarative entitlements file**:
-- `Config/lfm2onios.entitlements` - All app entitlements and capabilities
+- `Config/VoiceBot.entitlements` - All app entitlements and capabilities
 - AI agents can safely edit this XML file to add HealthKit, CloudKit, Push Notifications, etc.
 - No need to modify complex Xcode project files
 
 ### Asset Management
-- **App-Level Assets**: `lfm2onios/Assets.xcassets/` (app icon, accent color)
+- **App-Level Assets**: `VoiceBot/Assets.xcassets/` (app icon, accent color)
 - **Feature Assets**: Add `Resources/` folder to SPM package if needed
 
 ### SPM Package Resources
 To include assets in your feature package:
 ```swift
 .target(
-    name: "lfm2oniosFeature",
+    name: "VoiceBotFeature",
     dependencies: [],
     resources: [.process("Resources")]
 )

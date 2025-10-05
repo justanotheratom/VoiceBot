@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # Project Overview
 
-**lfm2onios** is a native iOS application (iOS 18.0+) that runs on-device LLM inference using Liquid AI's Leap SDK and MLX Swift. The app supports both LFM2 models (via Leap SDK) and Gemma models (via MLX Swift), with a chat interface featuring streaming responses, model management, and speech-to-text input.
+**VoiceBot** is a native iOS application (iOS 18.0+) that runs on-device LLM inference using Liquid AI's Leap SDK and MLX Swift. The app supports both LFM2 models (via Leap SDK) and Gemma models (via MLX Swift), with a chat interface featuring streaming responses, model management, and speech-to-text input.
 
 - **Tech Stack:** Swift 6.1+, SwiftUI, Swift Concurrency (async/await, actors)
 - **Architecture:** Model-View (MV) pattern with native SwiftUI state management (@State, @Observable, @Environment)
@@ -24,14 +24,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Project Architecture
 
 ```
-lfm2onios/
-├── lfm2onios.xcworkspace/              # Open this in Xcode
-├── lfm2onios.xcodeproj/                # App shell (minimal)
-├── lfm2onios/                          # App target entry point
-│   └── lfm2oniosApp.swift              # @main app lifecycle
-├── lfm2oniosPackage/                   # 🚀 All development happens here
+VoiceBot/
+├── VoiceBot.xcworkspace/              # Open this in Xcode
+├── VoiceBot.xcodeproj/                # App shell (minimal)
+├── VoiceBot/                          # App target entry point
+│   └── VoiceBotApp.swift              # @main app lifecycle
+├── VoiceBotPackage/                   # 🚀 All development happens here
 │   ├── Package.swift                   # Dependencies (LeapSDK, MLX, etc.)
-│   ├── Sources/lfm2oniosFeature/       # Feature code
+│   ├── Sources/VoiceBotFeature/       # Feature code
 │   │   ├── ContentView.swift           # Root view & chat UI
 │   │   ├── ModelCatalog.swift          # Model metadata
 │   │   ├── *Service.swift              # Core business logic
@@ -39,14 +39,14 @@ lfm2onios/
 │   │   ├── MicrophoneInputBar.swift    # Speech input UI
 │   │   ├── Conversations/              # Chat history models
 │   │   └── ...
-│   └── Tests/lfm2oniosFeatureTests/    # Unit tests
+│   └── Tests/VoiceBotFeatureTests/    # Unit tests
 ├── Config/                              # Build settings
 │   ├── Shared.xcconfig                 # Bundle ID, versions
-│   └── lfm2onios.entitlements          # Speech, microphone permissions
+│   └── VoiceBot.entitlements          # Speech, microphone permissions
 └── docs/                                # Design docs, PRD
 ```
 
-**Important:** All feature development happens in `lfm2oniosPackage/Sources/lfm2oniosFeature/`. The app target only imports and displays the package.
+**Important:** All feature development happens in `VoiceBotPackage/Sources/VoiceBotFeature/`. The app target only imports and displays the package.
 
 # Common Development Commands
 
@@ -60,15 +60,15 @@ list_sims({ enabled: true })
 
 // Build and run on iPhone 16 simulator
 build_run_sim({
-    workspacePath: "/path/to/lfm2onios.xcworkspace",
-    scheme: "lfm2onios",
+    workspacePath: "/path/to/VoiceBot.xcworkspace",
+    scheme: "VoiceBot",
     simulatorName: "iPhone 16"
 })
 
 // Build for device
 build_dev_ws({
-    workspacePath: "/path/to/lfm2onios.xcworkspace",
-    scheme: "lfm2onios",
+    workspacePath: "/path/to/VoiceBot.xcworkspace",
+    scheme: "VoiceBot",
     configuration: "Debug"
 })
 ```
@@ -78,8 +78,8 @@ build_dev_ws({
 ```javascript
 // Run all tests on simulator
 test_sim_name_ws({
-    workspacePath: "/path/to/lfm2onios.xcworkspace",
-    scheme: "lfm2onios",
+    workspacePath: "/path/to/VoiceBot.xcworkspace",
+    scheme: "VoiceBot",
     simulatorName: "iPhone 16"
 })
 
@@ -102,7 +102,7 @@ type_text({ simulatorUuid: "UUID", text: "Hello" })
 screenshot({ simulatorUuid: "UUID" })
 
 // Capture logs
-start_sim_log_cap({ simulatorUuid: "UUID", bundleId: "com.oneoffrepo.lfm2onios" })
+start_sim_log_cap({ simulatorUuid: "UUID", bundleId: "com.oneoffrepo.VoiceBot" })
 stop_sim_log_cap({ logSessionId: "SESSION_ID" })
 ```
 
@@ -215,7 +215,7 @@ Uses iOS Speech framework for microphone input:
 - **Service:** `SpeechRecognitionService` (actor) handles speech requests
 - **Permissions:** `NSSpeechRecognitionUsageDescription` and `NSMicrophoneUsageDescription` in Info.plist
 - **UI:** `MicrophoneInputBar` with visual feedback during recording
-- **Entitlements:** `Config/lfm2onios.entitlements` includes microphone access
+- **Entitlements:** `Config/VoiceBot.entitlements` includes microphone access
 
 # Key Implementation Notes
 
@@ -282,7 +282,7 @@ func downloadProgress() async throws {
 }
 ```
 
-**Test files:** `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/`
+**Test files:** `VoiceBotPackage/Tests/VoiceBotFeatureTests/`
 
 **Run tests:** Use `test_sim_name_ws` tool (NOT `swift_package_test`)
 
@@ -292,7 +292,7 @@ Uses Apple Unified Logging with structured JSON:
 
 ```swift
 import os
-let logger = Logger(subsystem: "com.oneoffrepo.lfm2onios", category: "runtime")
+let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "runtime")
 
 logger.info("{ event: \"load:start\", url: \"\(url.path)\" }")
 logger.info("{ event: \"stream:complete\", tokens: \(count), usage: \(tps) }")
@@ -302,8 +302,8 @@ logger.info("{ event: \"stream:complete\", tokens: \(count), usage: \(tps) }")
 
 # Development Workflow
 
-1. **Make changes** in `lfm2oniosPackage/Sources/lfm2oniosFeature/`
-2. **Write tests** in `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/`
+1. **Make changes** in `VoiceBotPackage/Sources/VoiceBotFeature/`
+2. **Write tests** in `VoiceBotPackage/Tests/VoiceBotFeatureTests/`
 3. **Build & test** using XcodeBuildMCP tools
 4. **Deploy to simulator** for manual testing
 5. **Verify with automation** (describe_ui, tap, screenshot)
@@ -319,7 +319,7 @@ logger.info("{ event: \"stream:complete\", tokens: \(count), usage: \(tps) }")
 
 ## Add New Feature
 
-1. Create SwiftUI view in `lfm2oniosPackage/Sources/lfm2oniosFeature/`
+1. Create SwiftUI view in `VoiceBotPackage/Sources/VoiceBotFeature/`
 2. Add `@Observable` models if needed (no ViewModels!)
 3. Use `.task` for async operations
 4. Write tests in `Tests/` directory
@@ -327,7 +327,7 @@ logger.info("{ event: \"stream:complete\", tokens: \(count), usage: \(tps) }")
 
 ## Add SPM Dependency
 
-Edit `lfm2oniosPackage/Package.swift`:
+Edit `VoiceBotPackage/Package.swift`:
 
 ```swift
 dependencies: [
@@ -335,7 +335,7 @@ dependencies: [
 ],
 targets: [
     .target(
-        name: "lfm2oniosFeature",
+        name: "VoiceBotFeature",
         dependencies: ["Package"]
     )
 ]
@@ -343,7 +343,7 @@ targets: [
 
 ## Add Entitlements
 
-Edit `Config/lfm2onios.entitlements` (XML format):
+Edit `Config/VoiceBot.entitlements` (XML format):
 
 ```xml
 <key>com.apple.developer.some-capability</key>

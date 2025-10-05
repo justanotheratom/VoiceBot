@@ -6,7 +6,7 @@ This repository contains an iOS SwiftUI application scaffolded for iOS 17.2+. Ph
 – Phase 2 adds a curated model catalog and selection UI with persistence.
 – Phase 3 added a mock download flow.
 – Phase 4 replaces the mock with real downloads of LFM2 bundles (no API key), shows inline progress with cancel, and supports delete for downloaded models.
-– Unified logging via `os.Logger` with subsystem `com.oneoffrepo.lfm2onios` and categories `app`, `download`, `runtime`, `ui`.
+– Unified logging via `os.Logger` with subsystem `com.oneoffrepo.VoiceBot` and categories `app`, `download`, `runtime`, `ui`.
 – Leap iOS SDK (v0.5.0) integrated via SPM and linkage verified at startup.
 
 
@@ -21,15 +21,15 @@ This repository contains an iOS SwiftUI application scaffolded for iOS 17.2+. Ph
 - Internet access for SPM to resolve the Leap SDK
 
 ## Project Structure
-- `lfm2onios/` — App target sources (entry point, logging)
-- `lfm2oniosPackage/` — Swift Package with feature code (`ContentView`, `LeapIntegration`)
+- `VoiceBot/` — App target sources (entry point, logging)
+- `VoiceBotPackage/` — Swift Package with feature code (`ContentView`, `LeapIntegration`)
 - `Config/` — Xcode configuration files
 - `docs/` — PRD and docs
 
 ## Running in Simulator (iPhone 16 Pro)
 1. Open the workspace:
-   - `lfm2onios.xcworkspace`
-2. Select scheme `lfm2onios` and simulator `iPhone 16 Pro`.
+   - `VoiceBot.xcworkspace`
+2. Select scheme `VoiceBot` and simulator `iPhone 16 Pro`.
 3. Run (Cmd+R).
 
 ### Expected UI (Phase 4)
@@ -39,7 +39,7 @@ This repository contains an iOS SwiftUI application scaffolded for iOS 17.2+. Ph
 – The `Chat` screen includes a "Switch Model" button that clears selection and returns to the catalog.
 
 ### Expected Logs
-Unified logging markers (filter by subsystem `com.oneoffrepo.lfm2onios`):
+Unified logging markers (filter by subsystem `com.oneoffrepo.VoiceBot`):
 ```
 app: { event: "launch", build: "1.0 (1)" }
 app: { event: "leap:sdkLinked", sdkVersion: "unknown" }
@@ -67,20 +67,20 @@ Implementation details:
 – No API key is required for these public bundle URLs.
 
 To add or change models, edit:
-`lfm2oniosPackage/Sources/lfm2oniosFeature/ModelCatalog.swift`
+`VoiceBotPackage/Sources/VoiceBotFeature/ModelCatalog.swift`
 and update the `downloadURLString`, `slug`, `quantizationSlug`, and metadata.
 
 ## Key Files
-- `lfm2onios/lfm2oniosApp.swift` — App entry point; emits launch log and attaches UI appear log.
-- `lfm2onios/Logging.swift` — Logging scaffolding via `os.Logger`, with legacy `os_log` and print fallbacks. Emits Leap SDK linkage status on startup.
-- `lfm2oniosPackage/Sources/lfm2oniosFeature/ContentView.swift` — Routes between `ModelSelectionView` and a stub `Chat` view; loads/saves selection.
-- `lfm2oniosPackage/Sources/lfm2oniosFeature/ModelCatalog.swift` — Curated list of models and metadata (includes HTTPS bundle URLs).
-- `lfm2oniosPackage/Sources/lfm2oniosFeature/ModelSelectionView.swift` — Model selection UI with inline progress, cancel, delete, and downloaded indicator.
-- `lfm2oniosPackage/Sources/lfm2oniosFeature/PersistenceService.swift` — Persists `SelectedModel` (including `localURL`) in `UserDefaults`.
-- `lfm2oniosPackage/Sources/lfm2oniosFeature/LeapIntegration.swift` — Helper for checking Leap SDK linkage and version string.
-- `lfm2oniosPackage/Sources/lfm2oniosFeature/ModelDownloadService.swift` — Real URL download implementation with progress & cancellation.
-- `lfm2oniosPackage/Sources/lfm2oniosFeature/ModelStorageService.swift` — Computes bundle locations and handles deletion.
-- `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/lfm2oniosFeatureTests.swift` — Basic catalog and persistence tests.
+- `VoiceBot/VoiceBotApp.swift` — App entry point; emits launch log and attaches UI appear log.
+- `VoiceBot/Logging.swift` — Logging scaffolding via `os.Logger`, with legacy `os_log` and print fallbacks. Emits Leap SDK linkage status on startup.
+- `VoiceBotPackage/Sources/VoiceBotFeature/ContentView.swift` — Routes between `ModelSelectionView` and a stub `Chat` view; loads/saves selection.
+- `VoiceBotPackage/Sources/VoiceBotFeature/ModelCatalog.swift` — Curated list of models and metadata (includes HTTPS bundle URLs).
+- `VoiceBotPackage/Sources/VoiceBotFeature/ModelSelectionView.swift` — Model selection UI with inline progress, cancel, delete, and downloaded indicator.
+- `VoiceBotPackage/Sources/VoiceBotFeature/PersistenceService.swift` — Persists `SelectedModel` (including `localURL`) in `UserDefaults`.
+- `VoiceBotPackage/Sources/VoiceBotFeature/LeapIntegration.swift` — Helper for checking Leap SDK linkage and version string.
+- `VoiceBotPackage/Sources/VoiceBotFeature/ModelDownloadService.swift` — Real URL download implementation with progress & cancellation.
+- `VoiceBotPackage/Sources/VoiceBotFeature/ModelStorageService.swift` — Computes bundle locations and handles deletion.
+- `VoiceBotPackage/Tests/VoiceBotFeatureTests/VoiceBotFeatureTests.swift` — Basic catalog and persistence tests.
 
 ## Next Phase (Preview)
 Phase 5 will load a downloaded model with `Leap.load(url:)`, bring up a `Conversation`, and stream tokens into a chat UI. See `docs/PRD.md` for details.

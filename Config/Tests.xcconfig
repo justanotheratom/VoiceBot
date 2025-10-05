@@ -7,8 +7,8 @@
 // ==========================================
 // Test Target Settings (Customizable by scaffold tool)
 // ==========================================
-PRODUCT_BUNDLE_IDENTIFIER = com.oneoffrepo.lfm2onios
-TEST_TARGET_NAME = lfm2onios
+PRODUCT_BUNDLE_IDENTIFIER = com.oneoffrepo.VoiceBot
+TEST_TARGET_NAME = VoiceBot
 
 // Fix duplicate module name issue
 PRODUCT_MODULE_NAME = $(PRODUCT_NAME)UITests

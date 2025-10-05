@@ -127,7 +127,7 @@ Each phase is independently buildable and runnable end-to-end in the iOS Simulat
 
 Phase 0 — Project Bootstrap (E2E)
 - Create SwiftUI iOS app (iOS 17.2 minimum) with a single screen (“Hello lfm2”).
-- Add basic logging scaffolding using `os.log` with subsystem `com.oneoffrepo.lfm2onios` and categories: `app`, `download`, `runtime`, `ui`.
+- Add basic logging scaffolding using `os.log` with subsystem `com.oneoffrepo.VoiceBot` and categories: `app`, `download`, `runtime`, `ui`.
 - Simulator automation: list schemes, build for a simulator, run the app, verify launch and log output.
 
 - Status: Done (2025-08-29)
@@ -283,7 +283,7 @@ Owner’s Notes
 - Always keep the model runner singleton-like for the app session; avoid reloading for every message.
 
 ## Observability & Logging
-- Use Apple Unified Logging (`os.log`) with subsystem `com.oneoffrepo.lfm2onios` and categories:
+- Use Apple Unified Logging (`os.log`) with subsystem `com.oneoffrepo.VoiceBot` and categories:
   - `app`: app lifecycle, configuration, feature flags.
   - `download`: model resolution, progress, completion, failures, disk checks.
   - `runtime`: model load/unload, memory warnings, conversation lifecycle, token streaming.

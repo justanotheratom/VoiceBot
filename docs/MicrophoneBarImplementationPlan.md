@@ -22,12 +22,12 @@
 4. Error states: present inline messages for denied permissions, recognition failures, or short utterances. Allow retry without leaving the chat.
 
 ## Technical Plan
-### UI Restructure (`lfm2oniosPackage/Sources/lfm2oniosFeature/ChatView`)
+### UI Restructure (`VoiceBotPackage/Sources/VoiceBotFeature/ChatView`)
 - Remove the text field + send button stack; create a new `MicrophoneInputBar` view that exposes callbacks `onStartRecording()` and `onFinishRecording()`.
 - Track local state inside `ChatView` for recording status, permission errors, and the latest transcript. Gate `onStartRecording` when `isStreaming` true.
 - Trigger the existing message sending logic (`conversationManager?.send(message:)`) using the transcript string once available; preserve scroll-to-bottom behavior and existing streaming lines.
 
-### Speech Recognition Service (`lfm2oniosPackage/Sources/lfm2oniosFeature/`)
+### Speech Recognition Service (`VoiceBotPackage/Sources/VoiceBotFeature/`)
 - Introduce a `SpeechRecognitionService` actor that wraps `AVAudioEngine` + `SFSpeechRecognizer` for on-device capture.
 - Responsibilities: permission handling, session lifecycle, error propagation, returning the final transcript.
 - Configure with locale from selected model or system default; ensure `supportsOnDeviceRecognition` is true before starting, otherwise emit a user-facing error.
@@ -44,9 +44,9 @@
 - Reset state after successful send to keep the bar responsive.
 
 ### Testing Strategy
-- Add unit coverage in `lfm2oniosPackage/Tests/lfm2oniosFeatureTests/` for `SpeechRecognitionService` mocking out `SFSpeechRecognizer`/`AVAudioEngine` using dependency injection.
+- Add unit coverage in `VoiceBotPackage/Tests/VoiceBotFeatureTests/` for `SpeechRecognitionService` mocking out `SFSpeechRecognizer`/`AVAudioEngine` using dependency injection.
 - Update existing chat tests (if any) to cover the `send` pipeline triggered by transcripts.
-- Add a new UI test in `lfm2oniosUITests/` that simulates permission granted, long press interaction, and ensures the transcript message appears in the conversation log.
+- Add a new UI test in `VoiceBotUITests/` that simulates permission granted, long press interaction, and ensures the transcript message appears in the conversation log.
 
 ### Tooling & Integration
 - Update the simulator smoke test script to mention holding the mic button instead of typing text.

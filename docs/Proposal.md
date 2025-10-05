@@ -34,7 +34,7 @@ Extend the existing LFM2 on-device chatbot to support downloading and running Ge
   - `LeapDownloadAdapter` - wrap existing `ModelDownloadService` logic.
   - `GemmaDownloadAdapter` - port the relevant pieces of `ModelDownloadController`/`ModelStorage` from the sample repo, trimming advanced UI hooks but keeping resume, checksum, and `Hub` powered snapshot downloads.
 - Add a coordinator (e.g., `UnifiedModelDownloadService`) that picks the adapter based on `ModelCatalogEntry.runtime` and exposes the current `ModelDownloadServicing` API to views.
-- Reuse sample helpers (`ModelAssetDescriptor`, `ModelHubClient`, `HubTokenProvider`) in a new `GemmaRuntime` namespace under `lfm2oniosPackage/Sources/lfm2oniosFeature/`.
+- Reuse sample helpers (`ModelAssetDescriptor`, `ModelHubClient`, `HubTokenProvider`) in a new `GemmaRuntime` namespace under `VoiceBotPackage/Sources/VoiceBotFeature/`.
 - Support progress reporting in the same shape (0...1) to avoid UI churn. Translate file progress metrics into normalized percentages for Gemma downloads.
 
 ### 4. Runtime Execution Layer
@@ -53,7 +53,7 @@ Extend the existing LFM2 on-device chatbot to support downloading and running Ge
 - Maintain parity for streaming UX (typing indicator, send-button disable) regardless of runtime.
 
 ### 6. Configuration & Build System
-- Update `lfm2oniosPackage/Package.swift` with MLX + Hub dependencies and linker flag for `sqlite3`. Assess whether the host app target also needs bridging headers or embedded resources.
+- Update `VoiceBotPackage/Package.swift` with MLX + Hub dependencies and linker flag for `sqlite3`. Assess whether the host app target also needs bridging headers or embedded resources.
 - Add xcconfig toggles (e.g., optional Hugging Face token `GEMMA_HF_TOKEN`) following the sample's `HubTokenProvider` strategy, defaulting to empty for public models.
 - Document any minimum OS bumps (MLX currently targets iOS 18; verify we can keep iOS 17 compatibility or gate Gemma availability behind runtime checks).
 
