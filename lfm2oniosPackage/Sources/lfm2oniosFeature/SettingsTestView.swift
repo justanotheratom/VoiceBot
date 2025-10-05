@@ -43,7 +43,7 @@ public struct SettingsTestView: View {
                 // Available models section
                 Section {
                     ForEach(ModelCatalog.all) { entry in
-                        CleanModelRow(
+                        ModelRowCard(
                             entry: entry,
                             isSelected: selectedModelSlug == entry.slug,
                             downloadState: downloadStates[entry.slug] ?? .notStarted,

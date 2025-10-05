@@ -111,61 +111,7 @@ struct ChatView: View {
     
     @ViewBuilder
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            
-            // AI Assistant Icon with animation
-            Image(systemName: "brain.head.profile")
-                .font(.system(size: 60))
-                .foregroundStyle(.blue.gradient)
-                .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
-            
-            VStack(spacing: 8) {
-                Text("Ready to Chat")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.primary)
-                
-                Text("Ask me anything or start a conversation")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            
-            suggestionPillsView
-            
-            Spacer()
-        }
-        .padding()
-        .contentShape(Rectangle())
-    }
-    
-    @ViewBuilder
-    private var suggestionPillsView: some View {
-        VStack(spacing: 12) {
-            Text("Try asking:")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-            
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 8) {
-                SuggestionPill(text: "Explain a concept") {
-                    sendTranscript("Can you explain quantum computing in simple terms?")
-                }
-                SuggestionPill(text: "Write code") {
-                    sendTranscript("Write a SwiftUI view that displays a list")
-                }
-                SuggestionPill(text: "Creative writing") {
-                    sendTranscript("Write a short story about space exploration")
-                }
-                SuggestionPill(text: "Problem solving") {
-                    sendTranscript("Help me debug this Swift code")
-                }
-            }
-        }
-        .padding(.horizontal, 20)
+        EmptyStateView(onSuggestionTap: sendTranscript)
     }
     
     @ViewBuilder
@@ -621,26 +567,26 @@ struct ChatView: View {
 
 // MARK: - Chat models
 
-struct TokenStats: Equatable, Sendable {
-    let tokens: Int
-    let timeToFirstToken: TimeInterval?
-    let tokensPerSecond: Double?
-    
-    init(tokens: Int, timeToFirstToken: TimeInterval? = nil, tokensPerSecond: Double? = nil) {
+public struct TokenStats: Equatable, Sendable {
+    public let tokens: Int
+    public let timeToFirstToken: TimeInterval?
+    public let tokensPerSecond: Double?
+
+    public init(tokens: Int, timeToFirstToken: TimeInterval? = nil, tokensPerSecond: Double? = nil) {
         self.tokens = tokens
         self.timeToFirstToken = timeToFirstToken
         self.tokensPerSecond = tokensPerSecond
     }
 }
 
-struct Message: Identifiable, Equatable, Sendable {
-    enum Role: String, Sendable { case user, assistant }
-    let id: UUID
-    let role: Role
-    var text: String
-    var stats: TokenStats?
+public struct Message: Identifiable, Equatable, Sendable {
+    public enum Role: String, Sendable { case user, assistant }
+    public let id: UUID
+    public let role: Role
+    public var text: String
+    public var stats: TokenStats?
 
-    init(id: UUID = UUID(), role: Role, text: String, stats: TokenStats? = nil) {
+    public init(id: UUID = UUID(), role: Role, text: String, stats: TokenStats? = nil) {
         self.id = id
         self.role = role
         self.text = text
@@ -649,110 +595,4 @@ struct Message: Identifiable, Equatable, Sendable {
 }
 
 // MARK: - Helper Views
-
-struct SuggestionPill: View {
-    let text: String
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(text)
-                .font(.caption)
-                .lineLimit(1)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.regularMaterial, in: Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct ChatMessageView: View {
-    let message: Message
-    let isStreaming: Bool
-    
-    init(message: Message, isStreaming: Bool = false) {
-        self.message = message
-        self.isStreaming = isStreaming
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 12) {
-                // Avatar
-                Group {
-                    if message.role == .user {
-                        Image(systemName: "person.circle.fill")
-                            .foregroundStyle(.blue)
-                    } else {
-                        Image(systemName: "brain.head.profile")
-                            .foregroundStyle(.green)
-                    }
-                }
-                .font(.title3)
-                .frame(width: 28, height: 28)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    // Role label
-                    Text(message.role == .user ? "You" : "Assistant")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fontWeight(.medium)
-                    
-                    // Message content
-                    Text(message.text)
-                        .font(.body)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    // Streaming indicator for assistant messages
-                    if message.role == .assistant && isStreaming {
-                        HStack(spacing: 8) {
-                            HStack(spacing: 3) {
-                                ForEach(0..<3) { index in
-                                    Circle()
-                                        .fill(.secondary)
-                                        .frame(width: 5, height: 5)
-                                        .opacity(0.4)
-                                        .animation(
-                                            .easeInOut(duration: 0.6)
-                                            .repeatForever(autoreverses: true)
-                                            .delay(Double(index) * 0.15),
-                                            value: isStreaming
-                                        )
-                                        .scaleEffect(isStreaming ? 1.3 : 1.0)
-                                }
-                            }
-                            
-                            Text("Assistant is typing...")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.top, 4)
-                    }
-                }
-            }
-            
-            // Performance stats for assistant messages
-            if message.role == .assistant, let stats = message.stats {
-                HStack {
-                    Spacer()
-                        .frame(width: 40)
-                    HStack(spacing: 12) {
-                        Label("\(stats.tokens) tokens", systemImage: "number.circle")
-                        if let ttft = stats.timeToFirstToken {
-                            Label("\(String(format: "%.2f", ttft))s", systemImage: "clock")
-                        }
-                        if let tps = stats.tokensPerSecond {
-                            Label("\(String(format: "%.1f", tps))/s", systemImage: "speedometer")
-                        }
-                    }
-                    .labelStyle(.titleAndIcon)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    Spacer()
-                }
-            }
-        }
-    }
-}
+// Note: ChatMessageView, SuggestionPill, and EmptyStateView are now in UIComponents/

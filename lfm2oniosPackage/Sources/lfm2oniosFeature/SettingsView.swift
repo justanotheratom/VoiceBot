@@ -45,13 +45,13 @@ public struct SettingsView: View {
             // Clean model list
             Section {
                 ForEach(ModelCatalog.all) { entry in
-                    CleanModelRow(
+                    ModelRowCard(
                         entry: entry,
                         isSelected: currentModel?.slug == entry.slug,
                         downloadState: downloadStates[entry.slug] ?? .notStarted,
                         onSelect: { selectModel(entry) },
                         onDownload: { downloadModel(entry) },
-                        onDelete: { 
+                        onDelete: {
                             modelToDelete = entry
                             showDeleteConfirmation = true
                         },
@@ -358,13 +358,13 @@ struct ModelCardView: View {
     }
 }
 
-enum DownloadState: Equatable {
+public enum DownloadState: Equatable {
     case notStarted
     case inProgress(progress: Double)
     case downloaded(localURL: URL)
     case failed(error: String)
-    
-    var isDownloaded: Bool {
+
+    public var isDownloaded: Bool {
         if case .downloaded = self {
             return true
         }
@@ -427,231 +427,6 @@ struct CurrentModelRow: View {
     }
 }
 
-@available(iOS 17.0, macOS 13.0, *)
-struct CleanModelRow: View {
-    let entry: ModelCatalogEntry
-    let isSelected: Bool
-    let downloadState: DownloadState
-    let onSelect: () -> Void
-    let onDownload: () -> Void
-    let onDelete: () -> Void
-    let onCancel: () -> Void
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            // Model info (primary content)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(entry.displayName)
-                    .font(.headline)
-                
-                HStack(spacing: 8) {
-                    // Status indicator
-                    statusIndicator
-                    
-                    Text("\(entry.estDownloadMB) MB • \(entry.contextWindow) context")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                
-                // Description (only show if not selected to reduce clutter)
-                if !isSelected, case .notStarted = downloadState {
-                    Text(entry.shortDescription)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(2)
-                        .padding(.top, 2)
-                }
-                
-                // Progress bar for active downloads
-                if case .inProgress(let progress) = downloadState {
-                    ProgressView(value: progress)
-                        .progressViewStyle(.linear)
-                        .padding(.top, 4)
-                }
-            }
-            
-            Spacer()
-            
-            // Single action area (no competing buttons)
-            actionView
-        }
-        .padding(.vertical, 8)
-        .contentShape(Rectangle()) // Full row tappable
-        .onTapGesture {
-            if !isSelected, case .downloaded = downloadState {
-                onSelect()
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private var statusIndicator: some View {
-        Group {
-            switch downloadState {
-            case .downloaded where isSelected:
-                Label("Active", systemImage: "checkmark.circle.fill")
-                    .labelStyle(.iconOnly)
-                    .foregroundStyle(.green)
-            case .downloaded:
-                Label("Downloaded", systemImage: "checkmark.circle")
-                    .labelStyle(.iconOnly)
-                    .foregroundStyle(.blue)
-            case .inProgress(_):
-                Label("Downloading", systemImage: "arrow.down.circle.fill")
-                    .labelStyle(.iconOnly)
-                    .foregroundStyle(.blue)
-            case .failed:
-                Label("Failed", systemImage: "exclamationmark.triangle")
-                    .labelStyle(.iconOnly)
-                    .foregroundStyle(.red)
-            case .notStarted:
-                Label("Not Downloaded", systemImage: "cloud")
-                    .labelStyle(.iconOnly)
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .font(.caption)
-    }
-    
-    @ViewBuilder 
-    private var actionView: some View {
-        switch downloadState {
-        case .downloaded where isSelected:
-            Text("Active")
-                .font(.caption.weight(.medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.green.opacity(0.1))
-                .foregroundStyle(.green)
-                .clipShape(Capsule())
-                
-        case .downloaded:
-            // Secondary actions in menu (not inline)
-            Menu {
-                Button("Select Model") {
-                    onSelect()
-                }
-                
-                Divider()
-                Button("Delete", role: .destructive) {
-                    onDelete()
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
-            .menuStyle(.borderlessButton)
-            
-        case .inProgress(let progress):
-            VStack(spacing: 4) {
-                Text("\(Int(progress * 100))%")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.blue)
-                Button {
-                    onCancel()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            }
-            
-        case .failed:
-            Button("Retry") {
-                onDownload()
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .tint(.red)
-            
-        case .notStarted:
-            Button("Download") {
-                onDownload()
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        }
-    }
-}
-
-@available(iOS 17.0, macOS 13.0, *)
-struct StatusIndicator: View {
-    let state: DownloadState
-    let isSelected: Bool
-    
-    var body: some View {
-        Group {
-            switch state {
-            case .downloaded where isSelected:
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.blue)
-            case .downloaded:
-                Image(systemName: "checkmark.circle")
-                    .foregroundStyle(.green)
-            case .inProgress(let progress):
-                Text("\(Int(progress * 100))%")
-                    .font(.caption)
-                    .foregroundStyle(.blue)
-            case .failed:
-                Image(systemName: "exclamationmark.triangle")
-                    .foregroundStyle(.red)
-            case .notStarted:
-                Image(systemName: "cloud")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .font(.title3)
-    }
-}
-
-@available(iOS 17.0, macOS 13.0, *)
-struct ActionButton: View {
-    let state: DownloadState
-    let isSelected: Bool
-    let onSelect: () -> Void
-    let onDownload: () -> Void
-    let onDelete: () -> Void
-    let onCancel: () -> Void
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            switch state {
-            case .notStarted:
-                Button("Download", action: onDownload)
-                    .buttonStyle(.borderedProminent)
-                    .frame(maxWidth: .infinity)
-                    
-            case .inProgress:
-                Button("Cancel", action: onCancel)
-                    .buttonStyle(.bordered)
-                    .frame(maxWidth: .infinity)
-                    
-            case .downloaded where !isSelected:
-                Button("Select", action: onSelect)
-                    .buttonStyle(.borderedProminent)
-                    .frame(maxWidth: .infinity)
-                
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.bordered)
-                .foregroundStyle(.red)
-                
-            case .downloaded where isSelected:
-                Button("Selected", action: {})
-                    .buttonStyle(.bordered)
-                    .disabled(true)
-                    .frame(maxWidth: .infinity)
-                    
-            case .failed:
-                Button("Retry", action: onDownload)
-                    .buttonStyle(.bordered)
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity)
-            default:
-                EmptyView()
-            }
-        }
-    }
-}
+// MARK: - Note
+// CleanModelRow, StatusIndicator, and ActionButton have been refactored into ModelRowCard
+// in UIComponents/ModelRowCard.swift

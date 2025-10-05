@@ -499,21 +499,14 @@ struct VoiceInputBar: View {
                     sendTextInput()
                 }
 
-            Button(action: sendTextInput) {
-                ZStack {
-                    Circle()
-                        .fill(Color.blue.gradient)
-                        .frame(width: 40, height: 40)
-                        .shadow(color: .blue.opacity(0.3), radius: 6, y: 3)
-
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-            }
+            CircularActionButton(
+                icon: "arrow.up",
+                style: .primary,
+                size: 40,
+                action: sendTextInput
+            )
             .disabled(textInputContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .opacity(textInputContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1.0)
-            .buttonStyle(.plain)
 
             Button(action: {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -543,43 +536,19 @@ struct VoiceInputBar: View {
     }
 
     private func statusBanner(text: String, color: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "exclamationmark.circle.fill")
-                .font(.caption)
-            Text(text)
-                .font(.caption.weight(.medium))
-        }
-        .foregroundStyle(color)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
-        .background {
-            Capsule()
-                .fill(.thinMaterial)
-                .overlay {
-                    Capsule()
-                        .strokeBorder(color.opacity(0.2), lineWidth: 0.5)
-                }
-        }
-        .offset(y: -10)
-        .shadow(color: color.opacity(0.15), radius: 6, y: 3)
+        StatusBanner(text: text, color: color)
+            .offset(y: -10)
     }
 
     private var stopButton: some View {
-        Button(action: onStopStreaming) {
-            ZStack {
-                Circle()
-                    .fill(.red.gradient)
-                    .frame(width: 40, height: 40)
-                    .shadow(color: .red.opacity(0.3), radius: 6, y: 3)
-
-                Image(systemName: "stop.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-        }
-        .accessibilityLabel("Stop response")
-        .accessibilityIdentifier("stopButton")
-        .buttonStyle(.plain)
+        CircularActionButton(
+            icon: "stop.fill",
+            style: .destructive,
+            size: 40,
+            accessibilityLabel: "Stop response",
+            accessibilityIdentifier: "stopButton",
+            action: onStopStreaming
+        )
         .scaleEffect(1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isStreaming)
     }
