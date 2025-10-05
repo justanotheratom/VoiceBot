@@ -108,7 +108,7 @@ actor SpeechRecognitionService {
             try audioSession.setCategory(
                 .playAndRecord,
                 mode: .measurement,
-                options: [.duckOthers, .defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+                options: [.duckOthers, .defaultToSpeaker, .allowBluetoothA2DP]
             )
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         }
