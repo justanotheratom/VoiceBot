@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftUI
 
 /// Coordinates chat message streaming and state management
 @available(iOS 18.0, macOS 13.0, *)
@@ -163,10 +164,11 @@ final class ChatStreamingCoordinator {
                     prompt: prompt,
                     conversation: llmMessages,
                     tokenLimit: tokenBudget
-                ) { token in
+                ) { [weak self] token in
                     await MainActor.run {
+                        guard let self = self else { return }
                         // Check if task was cancelled or messages were cleared
-                        guard !Task.isCancelled, assistantIndex < messages.count else {
+                        guard !Task.isCancelled, assistantIndex < self.messages.count else {
                             return
                         }
 
@@ -174,7 +176,7 @@ final class ChatStreamingCoordinator {
                             firstTokenTime = Date()
                         }
                         tokenCount += 1
-                        messages[assistantIndex].text += token
+                        self.messages[assistantIndex].text += token
                     }
                 }
 

@@ -47,18 +47,23 @@ final class ModelDownloadStore {
         AppLogger.logDownloadStart(modelSlug: entry.slug, quantization: entry.quantizationSlug)
         downloadStates[entry.slug] = .inProgress(progress: 0.0)
 
-        Task {
+        Task { [weak self] in
+            guard let self = self else { return }
             do {
                 let result = try await downloadService.downloadModel(entry: entry) { progress in
-                    Task { @MainActor in
-                        downloadStates[entry.slug] = .inProgress(progress: progress)
+                    Task { @MainActor [weak self] in
+                        self?.downloadStates[entry.slug] = .inProgress(progress: progress)
                         AppLogger.logDownloadProgress(modelSlug: entry.slug, progress: progress)
                     }
                 }
-                downloadStates[entry.slug] = .downloaded(localURL: result.localURL)
+                await MainActor.run {
+                    self.downloadStates[entry.slug] = .downloaded(localURL: result.localURL)
+                }
                 AppLogger.logDownloadComplete(modelSlug: entry.slug, localPath: result.localURL.path)
             } catch {
-                downloadStates[entry.slug] = .failed(error: error.localizedDescription)
+                await MainActor.run {
+                    self.downloadStates[entry.slug] = .failed(error: error.localizedDescription)
+                }
                 AppLogger.logDownloadFailed(modelSlug: entry.slug, error: error)
             }
         }
