@@ -3,76 +3,60 @@ import SwiftUI
 @available(iOS 18.0, macOS 13.0, *)
 @MainActor
 public struct ContentView: View {
-    @State private var persistence = PersistenceService()
-    @State private var selected: SelectedModel? = nil
-    @State private var previousSelected: SelectedModel? = nil
-    private let storage = ModelStorageService()
+    @State private var coordinator = ModelSelectionCoordinator()
 
-    public init() {
-        let p = PersistenceService()
-        _persistence = State(initialValue: p)
-        _selected = State(initialValue: p.loadSelectedModel())
-    }
+    public init() {}
 
     public var body: some View {
         NavigationStack {
             Group {
-                if let current = selected, current.localURL != nil {
-                    ChatView(selected: current, onSwitch: {
-                        previousSelected = current
-                        persistence.clearSelectedModel()
-                        selected = nil
-                    }, onSelectModel: { model in
-                        selected = model
-                    }, onDeleteModel: { entry in
-                        do {
-                            try storage.deleteDownloadedModel(entry: entry)
-                            if let current = selected, current.slug == entry.slug {
-                                // Clear selection if we deleted the active model
-                                persistence.clearSelectedModel()
-                                selected = nil
+                if let current = coordinator.currentModel, current.localURL != nil {
+                    ChatView(
+                        selected: current,
+                        onSwitch: {
+                            coordinator.requestModelChange()
+                        },
+                        onSelectModel: { model in
+                            coordinator.selectModel(model)
+                        },
+                        onDeleteModel: { entry in
+                            do {
+                                try coordinator.deleteModel(entry)
+                            } catch {
+                                AppLogger.download().logError(event: "deleteFailed", error: error, data: ["modelSlug": entry.slug])
                             }
-                        } catch {
-                            AppLogger.download().logError(event: "deleteFailed", error: error, data: ["modelSlug": entry.slug])
-                        }
-                    }, persistence: persistence)
+                        },
+                        persistence: PersistenceService()
+                    )
                 } else {
-                    ModelSelectionView { entry, localURL in
-                        // Persist with localURL when inline download completes
-                        let model = SelectedModel(
-                            slug: entry.slug,
-                            displayName: entry.displayName,
-                            provider: entry.provider,
-                            quantizationSlug: entry.quantizationSlug,
-                            localURL: localURL,
-                            runtime: entry.runtime,
-                            runtimeIdentifier: entry.gemmaMetadata?.assetIdentifier
-                        )
-                        persistence.saveSelectedModel(model)
-                        selected = model
-                    } onDelete: { entry in
-                        do {
-                            try storage.deleteDownloadedModel(entry: entry)
-                            if let current = selected, current.slug == entry.slug {
-                                // Clear selection if we deleted the active model
-                                persistence.clearSelectedModel()
-                                selected = nil
+                    ModelSelectionView(
+                        onComplete: { entry, localURL in
+                            let model = SelectedModel(
+                                slug: entry.slug,
+                                displayName: entry.displayName,
+                                provider: entry.provider,
+                                quantizationSlug: entry.quantizationSlug,
+                                localURL: localURL,
+                                runtime: entry.runtime,
+                                runtimeIdentifier: entry.gemmaMetadata?.assetIdentifier
+                            )
+                            coordinator.selectModel(model)
+                        },
+                        onDelete: { entry in
+                            do {
+                                try coordinator.deleteModel(entry)
+                            } catch {
+                                AppLogger.download().logError(event: "deleteFailed", error: error, data: ["modelSlug": entry.slug])
                             }
-                        } catch {
-                            AppLogger.download().logError(event: "deleteFailed", error: error, data: ["modelSlug": entry.slug])
+                        },
+                        onCancel: {
+                            coordinator.cancelModelChange()
                         }
-                    } onCancel: {
-                        if let prev = previousSelected {
-                            selected = prev
-                            persistence.saveSelectedModel(prev)
-                            previousSelected = nil
-                        }
-                    }
+                    )
                 }
             }
             .task {
-                // Ensure selection is up to date on appear as well
-                selected = persistence.loadSelectedModel()
+                coordinator.refreshModel()
             }
         }
     }
