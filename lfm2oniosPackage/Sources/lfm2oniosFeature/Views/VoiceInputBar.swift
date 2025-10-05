@@ -140,7 +140,7 @@ struct VoiceInputBar: View {
         }
         .overlay {
             RoundedRectangle(cornerRadius: 22)
-                .strokeBorder(.quaternary, lineWidth: 0.5)
+                .strokeBorder(.blue, lineWidth: 0.5)
         }
         .contentShape(RoundedRectangle(cornerRadius: 22))
         .scaleEffect(microphoneStatus == .recording ? 1.02 : 1.0)
