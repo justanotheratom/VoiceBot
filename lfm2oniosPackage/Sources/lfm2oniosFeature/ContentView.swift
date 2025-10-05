@@ -1,11 +1,5 @@
 import SwiftUI
 
-enum MicrophonePermissionState: Equatable {
-    case granted
-    case denied
-    case undetermined
-}
-
 @available(iOS 18.0, macOS 13.0, *)
 @MainActor
 public struct ContentView: View {
