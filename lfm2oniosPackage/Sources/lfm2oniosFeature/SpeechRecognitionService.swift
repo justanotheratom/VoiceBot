@@ -99,7 +99,7 @@ actor SpeechRecognitionService {
 
         let audioEngine = AVAudioEngine()
         let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = false
+        request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = true
 
         #if os(iOS)
@@ -148,11 +148,48 @@ actor SpeechRecognitionService {
     func stop() async throws -> String? {
         guard state == .recording else { throw ServiceError.noActiveRecognition }
 
-        return try await withCheckedThrowingContinuation { continuation in
-            finishContinuation = continuation
-            recognitionRequest?.endAudio()
-            audioEngine?.stop()
+        // Stop audio input
+        recognitionRequest?.endAudio()
+        audioEngine?.stop()
+
+        // Wait for final result with timeout, fallback to latest partial result
+        let result: String? = try await withThrowingTaskGroup(of: String?.self) { [weak self] group in
+            guard let self else { throw ServiceError.noActiveRecognition }
+
+            // Task 1: Wait for final recognition result
+            group.addTask { [weak self] in
+                try await withCheckedThrowingContinuation { continuation in
+                    guard let self else {
+                        continuation.resume(throwing: ServiceError.noActiveRecognition)
+                        return
+                    }
+                    Task {
+                        await self.setFinishContinuation(continuation)
+                    }
+                }
+            }
+
+            // Task 2: Timeout fallback - return partial transcript if available
+            group.addTask { [weak self] in
+                try await Task.sleep(for: .seconds(1.5))
+                return await self?.latestTranscription
+            }
+
+            // Return first result (either final or timeout fallback)
+            guard let result = try await group.next() else {
+                throw ServiceError.recognitionFailed("No result received")
+            }
+
+            group.cancelAll()
+            return result
         }
+
+        await cleanup()
+        return result
+    }
+
+    private func setFinishContinuation(_ continuation: CheckedContinuation<String?, Error>) {
+        finishContinuation = continuation
     }
 
     func cancel() async {
@@ -163,13 +200,16 @@ actor SpeechRecognitionService {
         await cleanup()
     }
 
+    func getCurrentTranscript() -> String? {
+        latestTranscription
+    }
+
     private func processRecognitionUpdate(transcript: String?, isFinal: Bool, error: NSError?) async {
         if let error {
             if let continuation = finishContinuation {
                 continuation.resume(throwing: ServiceError.recognitionFailed(error.localizedDescription))
                 finishContinuation = nil
             }
-            await cleanup()
             return
         }
 
@@ -182,7 +222,6 @@ actor SpeechRecognitionService {
                 continuation.resume(returning: latestTranscription)
                 finishContinuation = nil
             }
-            await cleanup()
         }
     }
 

@@ -30,6 +30,11 @@ struct VoiceInputBar: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if let transcript = controller.liveTranscript, !transcript.isEmpty, controller.isRecording {
+                liveTranscriptOverlay(transcript: transcript)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
             HStack(spacing: 12) {
                 if isTextInputMode {
                     textInputField
@@ -364,6 +369,24 @@ struct VoiceInputBar: View {
         case .error:
             return "Tap and hold again to retry."
         }
+    }
+
+    private func liveTranscriptOverlay(transcript: String) -> some View {
+        Text(transcript)
+            .font(.subheadline)
+            .foregroundStyle(.primary)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: .black.opacity(0.1), radius: 8, y: 2)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
     }
 }
 

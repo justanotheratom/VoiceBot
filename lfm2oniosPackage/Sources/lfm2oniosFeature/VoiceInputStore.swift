@@ -33,6 +33,7 @@ final class VoiceInputStore {
     var speechPermissionState: SpeechPermissionState = .unknown
     var hasPrefetchedSpeechPermission = false
     var isRequestingRecordPermission = false
+    var liveTranscript: String?
 
 #if os(iOS)
     var recordPermission: MicrophonePermissionState = .undetermined
@@ -47,6 +48,7 @@ final class VoiceInputStore {
     @ObservationIgnored private let speechService: SpeechRecognitionService
     @ObservationIgnored private var errorDismissTask: Task<Void, Never>?
     @ObservationIgnored private var transcriptHandler: ((String) -> Void)?
+    @ObservationIgnored private var transcriptPollingTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -56,6 +58,7 @@ final class VoiceInputStore {
 
     deinit {
         errorDismissTask?.cancel()
+        transcriptPollingTask?.cancel()
     }
 
     // MARK: - Computed UI Properties
@@ -162,6 +165,7 @@ final class VoiceInputStore {
             isRecording = true
             clearMicrophoneError()
             recordingStartTime = Date()
+            startTranscriptPolling()
             AppLogger.ui().log(event: "mic:record:start", data: ["model": modelSlug])
         } catch {
             isRecording = false
@@ -180,6 +184,7 @@ final class VoiceInputStore {
 
         guard isRecording else { return }
 
+        stopTranscriptPolling()
         isRecording = false
         isTranscribing = true
 
@@ -235,6 +240,7 @@ final class VoiceInputStore {
     }
 
     func cancelActiveRecording() async {
+        stopTranscriptPolling()
         recordingStartTime = nil
         transcriptHandler = nil
         await speechService.cancel()
@@ -349,5 +355,31 @@ final class VoiceInputStore {
 #else
         _ = await speechService.authorizationStatus()
 #endif
+    }
+
+    // MARK: - Live Transcript Polling
+
+    private func startTranscriptPolling() {
+        transcriptPollingTask?.cancel()
+        liveTranscript = nil
+
+        transcriptPollingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { break }
+
+                if let transcript = await self?.speechService.getCurrentTranscript() {
+                    await MainActor.run {
+                        self?.liveTranscript = transcript
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopTranscriptPolling() {
+        transcriptPollingTask?.cancel()
+        transcriptPollingTask = nil
+        liveTranscript = nil
     }
 }
