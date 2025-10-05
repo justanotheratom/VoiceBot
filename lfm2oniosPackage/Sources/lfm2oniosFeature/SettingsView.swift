@@ -12,13 +12,9 @@ public struct SettingsView: View {
     let onSelectModel: (ModelCatalogEntry, URL?) -> Void
     let onDeleteModel: (ModelCatalogEntry) -> Void
     let persistence: PersistenceService
-    
-    @State private var storage = ModelStorageService()
-    @State private var downloadService = ModelDownloadService()
-    @State private var downloadStates: [String: DownloadState] = [:]
-    @State private var showDeleteConfirmation = false
-    @State private var modelToDelete: ModelCatalogEntry?
-    
+
+    @State private var downloadStore = ModelDownloadStore()
+
     public init(
         currentModel: SelectedModel?,
         onSelectModel: @escaping (ModelCatalogEntry, URL?) -> Void,
@@ -41,21 +37,20 @@ public struct SettingsView: View {
                     Text("Current Model")
                 }
             }
-            
+
             // Clean model list
             Section {
                 ForEach(ModelCatalog.all) { entry in
                     ModelRowCard(
                         entry: entry,
                         isSelected: currentModel?.slug == entry.slug,
-                        downloadState: downloadStates[entry.slug] ?? .notStarted,
+                        downloadState: downloadStore.downloadStates[entry.slug] ?? .notStarted,
                         onSelect: { selectModel(entry) },
-                        onDownload: { downloadModel(entry) },
+                        onDownload: { downloadStore.downloadModel(entry) },
                         onDelete: {
-                            modelToDelete = entry
-                            showDeleteConfirmation = true
+                            downloadStore.requestDelete(entry)
                         },
-                        onCancel: { cancelDownload(entry) }
+                        onCancel: { downloadStore.cancelDownload(entry) }
                     )
                     .accessibilityIdentifier("modelCard_\(entry.slug)")
                 }
@@ -69,83 +64,28 @@ public struct SettingsView: View {
         #endif
         .accessibilityLabel("Models list. Choose a model to download and use for conversations.")
         .task {
-            await loadDownloadStates()
+            downloadStore.loadDownloadStates()
         }
-        .alert("Delete Model", isPresented: $showDeleteConfirmation) {
+        .alert("Delete Model", isPresented: $downloadStore.showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {
-                modelToDelete = nil
+                downloadStore.cancelDelete()
             }
             Button("Delete", role: .destructive) {
-                if let model = modelToDelete {
-                    deleteModel(model)
-                }
-                modelToDelete = nil
+                downloadStore.confirmDelete(onDelete: onDeleteModel)
             }
         } message: {
-            if let model = modelToDelete {
+            if let model = downloadStore.modelToDelete {
                 Text("Delete \(model.displayName)? This will free up \(model.estDownloadMB) MB.")
             }
         }
     }
-    
-    private func loadDownloadStates() async {
-        await MainActor.run {
-            for entry in ModelCatalog.all {
-                if storage.isDownloaded(entry: entry) {
-                    if let url = try? storage.expectedResourceURL(for: entry) {
-                        downloadStates[entry.slug] = .downloaded(localURL: url)
-                    }
-                } else {
-                    downloadStates[entry.slug] = .notStarted
-                }
-            }
-        }
-    }
-    
+
     private func selectModel(_ entry: ModelCatalogEntry) {
-        guard let state = downloadStates[entry.slug],
+        guard let state = downloadStore.downloadStates[entry.slug],
               case .downloaded(let url) = state else { return }
-        
+
         AppLogger.logSettingsAction(action: "selectModel", modelSlug: entry.slug)
         onSelectModel(entry, url)
-    }
-    
-    private func downloadModel(_ entry: ModelCatalogEntry) {
-        AppLogger.logDownloadStart(modelSlug: entry.slug, quantization: entry.quantizationSlug)
-        downloadStates[entry.slug] = .inProgress(progress: 0.0)
-        
-        Task {
-            do {
-                let result = try await downloadService.downloadModel(entry: entry) { progress in
-                    Task { @MainActor in
-                        downloadStates[entry.slug] = .inProgress(progress: progress)
-                        AppLogger.logDownloadProgress(modelSlug: entry.slug, progress: progress)
-                    }
-                }
-                await MainActor.run {
-                    downloadStates[entry.slug] = .downloaded(localURL: result.localURL)
-                    AppLogger.logDownloadComplete(modelSlug: entry.slug, localPath: result.localURL.path)
-                }
-            } catch {
-                await MainActor.run {
-                    downloadStates[entry.slug] = .failed(error: error.localizedDescription)
-                    AppLogger.logDownloadFailed(modelSlug: entry.slug, error: error)
-                }
-            }
-        }
-    }
-    
-    private func cancelDownload(_ entry: ModelCatalogEntry) {
-        AppLogger.logSettingsAction(action: "cancelDownload", modelSlug: entry.slug)
-        // Note: ModelDownloadService doesn't currently support cancellation
-        // For now, just reset the state
-        downloadStates[entry.slug] = .notStarted
-    }
-    
-    private func deleteModel(_ entry: ModelCatalogEntry) {
-        AppLogger.logSettingsAction(action: "deleteModel", modelSlug: entry.slug)
-        onDeleteModel(entry)
-        downloadStates[entry.slug] = .notStarted
     }
 }
 
