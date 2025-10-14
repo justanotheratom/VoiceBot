@@ -91,6 +91,9 @@ public struct ChatMessageView: View {
                 .frame(width: 40)
             HStack(spacing: 12) {
                 Label("\(stats.tokens) tokens", systemImage: "number.circle")
+                if let total = stats.totalDuration {
+                    Label("\(String(format: "%.2f", total))s", systemImage: "hourglass")
+                }
                 if let ttft = stats.timeToFirstToken {
                     Label("\(String(format: "%.2f", ttft))s", systemImage: "clock")
                 }

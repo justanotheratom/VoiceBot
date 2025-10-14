@@ -6,11 +6,18 @@ public struct TokenStats: Equatable, Sendable {
     public let tokens: Int
     public let timeToFirstToken: TimeInterval?
     public let tokensPerSecond: Double?
+    public let totalDuration: TimeInterval?
 
-    public init(tokens: Int, timeToFirstToken: TimeInterval? = nil, tokensPerSecond: Double? = nil) {
+    public init(
+        tokens: Int,
+        timeToFirstToken: TimeInterval? = nil,
+        tokensPerSecond: Double? = nil,
+        totalDuration: TimeInterval? = nil
+    ) {
         self.tokens = tokens
         self.timeToFirstToken = timeToFirstToken
         self.tokensPerSecond = tokensPerSecond
+        self.totalDuration = totalDuration
     }
 }
 

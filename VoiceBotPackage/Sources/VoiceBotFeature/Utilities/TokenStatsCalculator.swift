@@ -16,7 +16,8 @@ enum TokenStatsCalculator {
         return TokenStats(
             tokens: tokenCount,
             timeToFirstToken: timeToFirstToken,
-            tokensPerSecond: tokensPerSecond
+            tokensPerSecond: tokensPerSecond,
+            totalDuration: totalTime
         )
     }
 }

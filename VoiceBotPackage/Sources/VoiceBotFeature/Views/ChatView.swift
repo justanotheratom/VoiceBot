@@ -427,7 +427,8 @@ struct ChatView: View {
                     messages[assistantIndex].stats = TokenStats(
                         tokens: tokenCount,
                         timeToFirstToken: timeToFirstToken,
-                        tokensPerSecond: tokensPerSecond
+                        tokensPerSecond: tokensPerSecond,
+                        totalDuration: totalTime
                     )
 
                     // Add assistant response to conversation manager
