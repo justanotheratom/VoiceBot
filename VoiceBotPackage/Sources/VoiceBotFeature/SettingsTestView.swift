@@ -34,7 +34,9 @@ public struct SettingsTestView: View {
                 // Current model section
                 if let current = currentModel {
                     Section {
-                        CurrentModelRow(model: current)
+                        CurrentModelRow(model: current) {
+                            deleteModel(current.slug)
+                        }
                     } header: {
                         Text("Current Model")
                     }

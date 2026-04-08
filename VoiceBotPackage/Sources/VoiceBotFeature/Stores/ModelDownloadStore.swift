@@ -31,6 +31,7 @@ final class ModelDownloadStore {
 
     /// Load initial download states for all models
     func loadDownloadStates() {
+        // First, check for downloaded models in catalog
         for entry in ModelCatalog.all {
             if storage.isDownloaded(entry: entry) {
                 if let url = try? storage.expectedResourceURL(for: entry) {
@@ -38,6 +39,36 @@ final class ModelDownloadStore {
                 }
             } else {
                 downloadStates[entry.slug] = .notStarted
+            }
+        }
+
+        // Second, clean up orphans (models on disk but not in catalog, e.g. renamed slugs)
+        Task.detached {
+            do {
+                let fm = FileManager.default
+                let root = try self.storage.modelsRootDirectory()
+                guard fm.fileExists(atPath: root.path) else { return }
+
+                let contents = try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+                let activeSlugs = Set(ModelCatalog.all.map { $0.slug })
+                let activeQuants = Set(ModelCatalog.all.compactMap { $0.quantizationSlug })
+                let activeAssetIDs = Set(ModelCatalog.all.compactMap { $0.gemmaMetadata?.assetIdentifier })
+
+                for url in contents {
+                    let name = url.lastPathComponent
+                    let nameWithoutExt = url.deletingPathExtension().lastPathComponent
+
+                    let isOrphan = !activeSlugs.contains(nameWithoutExt) &&
+                                   !activeQuants.contains(nameWithoutExt) &&
+                                   !activeAssetIDs.contains(name)
+
+                    if isOrphan {
+                        try fm.removeItem(at: url)
+                        AppLogger.storage().log(event: "cleanup:orphan", data: ["name": name])
+                    }
+                }
+            } catch {
+                AppLogger.storage().logError(event: "cleanup:failed", error: error)
             }
         }
     }

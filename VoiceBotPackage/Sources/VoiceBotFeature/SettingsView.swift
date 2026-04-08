@@ -32,7 +32,11 @@ public struct SettingsView: View {
             // Simplified current model section
             if let current = currentModel {
                 Section {
-                    CurrentModelRow(model: current)
+                    CurrentModelRow(model: current) {
+                        if let entry = ModelCatalog.entry(forSlug: current.slug) {
+                            downloadStore.requestDelete(entry)
+                        }
+                    }
                 } header: {
                     Text("Current Model")
                 }
@@ -338,6 +342,7 @@ public enum DownloadState: Equatable {
 @available(iOS 17.0, macOS 13.0, *)
 struct CurrentModelRow: View {
     let model: SelectedModel
+    let onDelete: () -> Void
     
     var body: some View {
         HStack {
@@ -355,6 +360,15 @@ struct CurrentModelRow: View {
             }
             
             Spacer()
+
+            Button(action: onDelete) {
+                Image(systemName: "trash")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(8)
+                    .background(.red.opacity(0.1), in: Circle())
+            }
+            .buttonStyle(.plain)
             
             Text("Active")
                 .font(.caption)
