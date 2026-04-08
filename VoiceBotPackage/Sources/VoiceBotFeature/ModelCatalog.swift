@@ -83,6 +83,50 @@ public enum ModelCatalog {
     /// Curated list of models for MVP. Keep small and focused.
     public static let all: [ModelCatalogEntry] = [
         ModelCatalogEntry(
+            id: "lfm2.5-350m",
+            displayName: "LFM2.5 350M",
+            provider: "LiquidAI",
+            slug: "lfm2.5-350m",
+            quantizationSlug: "lfm2.5-350m-8da4w",
+            estDownloadMB: 322,
+            contextWindow: 8192,
+            shortDescription: "Latest LFM2.5 text model; ultra-high token-to-parameter ratio",
+            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2.5-350M-8da4w_output_8da8w-seq_8192.bundle?download=true",
+            runtime: .leap
+        ),
+        ModelCatalogEntry(
+            id: "gemma4-e2b",
+            displayName: "Gemma 4 E2B IT",
+            provider: "Google",
+            slug: "gemma4-e2b",
+            quantizationSlug: nil,
+            estDownloadMB: 1_600,
+            contextWindow: 128_000,
+            shortDescription: "Multimodal-capable Gemma 4 E2B with reasoning mode via MLX runtime",
+            downloadURLString: nil,
+            runtime: .mlx,
+            gemmaMetadata: .init(
+                assetIdentifier: "gemma4-e2b-4bit",
+                repoID: "mlx-community/gemma-4-e2b-it-4bit",
+                revision: "main",
+                primaryFilePath: "model.safetensors",
+                matchingGlobs: [
+                    "config.json",
+                    "generation_config.json",
+                    "tokenizer.json",
+                    "tokenizer_config.json",
+                    "special_tokens_map.json",
+                    "preprocessor_config.json",
+                    "processor_config.json",
+                    "chat_template.jinja",
+                    "tokenizer.model",
+                    "model.safetensors.index.json",
+                    "model.safetensors"
+                ]
+            ),
+            systemPrompt: "You are an advanced on-device assistant using Gemma 4. Use step-by-step reasoning for complex queries. Answer directly and concisely otherwise."
+        ),
+        ModelCatalogEntry(
             id: "lfm2-350m",
             displayName: "LFM2 350M",
             provider: "LiquidAI",
