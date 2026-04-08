@@ -15,7 +15,7 @@ final class ConversationStore {
     @ObservationIgnored private let conversationService = ConversationService()
     @ObservationIgnored private let contextManager = ContextWindowManager()
     @ObservationIgnored private let titleService: TitleGenerationService
-    @ObservationIgnored private let logger = Logger(subsystem: "com.oneoffrepo.voicebot", category: "conversation")
+    @ObservationIgnored private let logger = Logger(subsystem: "llc.fungee.voicebot", category: "conversation")
     @ObservationIgnored private var activeModelSlug: String?
 
     // MARK: - Initialization

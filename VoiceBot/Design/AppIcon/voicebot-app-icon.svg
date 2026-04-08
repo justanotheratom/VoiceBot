@@ -27,7 +27,7 @@
     </linearGradient>
   </defs>
 
-  <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
   <circle cx="278" cy="164" r="420" fill="url(#glowTop)"/>
   <circle cx="792" cy="846" r="340" fill="url(#glowBottom)"/>
   <rect x="60" y="60" width="904" height="904" rx="172" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2"/>

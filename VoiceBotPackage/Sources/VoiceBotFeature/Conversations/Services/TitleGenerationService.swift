@@ -16,7 +16,7 @@ private actor TitleAccumulator {
 
 /// Actor service for generating conversation titles using LLM
 actor TitleGenerationService {
-    private let logger = Logger(subsystem: "com.oneoffrepo.voicebot", category: "title")
+    private let logger = Logger(subsystem: "llc.fungee.voicebot", category: "title")
     private let modelRuntimeService: ModelRuntimeService
 
     init(modelRuntimeService: ModelRuntimeService) {

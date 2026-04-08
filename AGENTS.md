@@ -24,7 +24,7 @@ Use XcodeBuildMCP to refresh the iPhone 16 simulator quickly when you need an in
 - `npx xcodebuildmcp boot_sim --simulatorUuid <UUID>` and `npx xcodebuildmcp open_sim` to surface the device.
 - `npx xcodebuildmcp build_sim --workspace VoiceBot.xcworkspace --scheme VoiceBot --simulatorId <UUID>` to compile the latest sources.
 - `npx xcodebuildmcp get_sim_app_path --workspace VoiceBot.xcworkspace --scheme VoiceBot --platform 'iOS Simulator' --simulatorId <UUID>` → copy the reported `.app` path, then run `npx xcodebuildmcp install_app_sim --simulatorUuid <UUID> --appPath <APP_PATH>`.
-- `npx xcodebuildmcp launch_app_sim --simulatorUuid <UUID> --bundleId com.oneoffrepo.VoiceBot` to start the app; the first screen should show "Select Model" cards.
+- `npx xcodebuildmcp launch_app_sim --simulatorUuid <UUID> --bundleId llc.fungee.voicebot` to start the app; the first screen should show "Select Model" cards.
 - Download "LFM2 350M" (`describe_ui` + `tap`), wait for the progress bar to reach 100%, then `tap` the cancel button to return to chat.
 - Use `tap` on the message field, `type_text --text "Hello simulator test!"`, and `tap` the send button; confirm the assistant replies and the input clears.
 - Re-run `describe_ui` to ensure the send button is disabled with an empty field, then stop the app if desired (`stop_app_sim`).

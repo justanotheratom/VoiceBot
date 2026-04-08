@@ -102,7 +102,7 @@ type_text({ simulatorUuid: "UUID", text: "Hello" })
 screenshot({ simulatorUuid: "UUID" })
 
 // Capture logs
-start_sim_log_cap({ simulatorUuid: "UUID", bundleId: "com.oneoffrepo.VoiceBot" })
+start_sim_log_cap({ simulatorUuid: "UUID", bundleId: "llc.fungee.voicebot" })
 stop_sim_log_cap({ logSessionId: "SESSION_ID" })
 ```
 
@@ -292,7 +292,7 @@ Uses Apple Unified Logging with structured JSON:
 
 ```swift
 import os
-let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "runtime")
+let logger = Logger(subsystem: "llc.fungee.voicebot", category: "runtime")
 
 logger.info("{ event: \"load:start\", url: \"\(url.path)\" }")
 logger.info("{ event: \"stream:complete\", tokens: \(count), usage: \(tps) }")

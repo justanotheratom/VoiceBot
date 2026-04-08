@@ -6,7 +6,7 @@ This repository contains an iOS SwiftUI application scaffolded for iOS 17.2+. Ph
 – Phase 2 adds a curated model catalog and selection UI with persistence.
 – Phase 3 added a mock download flow.
 – Phase 4 replaces the mock with real downloads of LFM2 bundles (no API key), shows inline progress with cancel, and supports delete for downloaded models.
-– Unified logging via `os.Logger` with subsystem `com.oneoffrepo.VoiceBot` and categories `app`, `download`, `runtime`, `ui`.
+– Unified logging via `os.Logger` with subsystem `llc.fungee.voicebot` and categories `app`, `download`, `runtime`, `ui`.
 – Leap iOS SDK (v0.5.0) integrated via SPM and linkage verified at startup.
 
 
@@ -39,7 +39,7 @@ This repository contains an iOS SwiftUI application scaffolded for iOS 17.2+. Ph
 – The `Chat` screen includes a "Switch Model" button that clears selection and returns to the catalog.
 
 ### Expected Logs
-Unified logging markers (filter by subsystem `com.oneoffrepo.VoiceBot`):
+Unified logging markers (filter by subsystem `llc.fungee.voicebot`):
 ```
 app: { event: "launch", build: "1.0 (1)" }
 app: { event: "leap:sdkLinked", sdkVersion: "unknown" }

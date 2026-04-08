@@ -3,7 +3,7 @@ import os.log
 
 /// Stateless service for conversation file persistence
 struct ConversationService: Sendable {
-    private let logger = Logger(subsystem: "com.oneoffrepo.voicebot", category: "conversation")
+    private let logger = Logger(subsystem: "llc.fungee.voicebot", category: "conversation")
 
     init() {}
 

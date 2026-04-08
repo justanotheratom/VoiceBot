@@ -17,7 +17,7 @@ enum GemmaHubClient {
 }
 
 enum GemmaHubTokenProvider {
-    private static let logger = Logger(subsystem: "com.oneoffrepo.voicebot", category: "hub")
+    private static let logger = Logger(subsystem: "llc.fungee.voicebot", category: "hub")
 
     static func huggingFaceToken() -> String? {
         let processInfo = ProcessInfo.processInfo

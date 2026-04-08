@@ -133,7 +133,7 @@ import os.log
 
 @Observable
 class ConversationService {
-    private let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "conversation")
+    private let logger = Logger(subsystem: "llc.fungee.voicebot", category: "conversation")
     private let conversationsDirectory: URL
     
     init() {
@@ -246,7 +246,7 @@ import Foundation
 import os.log
 
 struct ContextWindowManager {
-    private let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "context")
+    private let logger = Logger(subsystem: "llc.fungee.voicebot", category: "context")
     
     // Model context limits (in tokens)
     private let modelContextLimits: [String: Int] = [
@@ -371,7 +371,7 @@ import os.log
 
 @Observable
 class TitleGenerationService {
-    private let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "title")
+    private let logger = Logger(subsystem: "llc.fungee.voicebot", category: "title")
     private let modelRuntimeService: ModelRuntimeService
     
     init(modelRuntimeService: ModelRuntimeService) {
@@ -557,7 +557,7 @@ struct ConversationListView: View {
     @State private var conversations: [Conversation] = []
     @State private var searchText = ""
     
-    private let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "ui")
+    private let logger = Logger(subsystem: "llc.fungee.voicebot", category: "ui")
     
     let onConversationSelected: (Conversation) -> Void
     
@@ -682,7 +682,7 @@ class ConversationManager {
     private let conversationService = ConversationService()
     private let contextManager = ContextWindowManager()
     private let titleService: TitleGenerationService
-    private let logger = Logger(subsystem: "com.oneoffrepo.VoiceBot", category: "conversation")
+    private let logger = Logger(subsystem: "llc.fungee.voicebot", category: "conversation")
     
     var currentConversation: Conversation?
     var needsTitleGeneration = false

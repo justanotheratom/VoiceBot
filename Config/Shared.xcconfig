@@ -9,8 +9,8 @@
 // Project Identity
 // ==========================================
 PRODUCT_NAME = VoiceBot
-PRODUCT_DISPLAY_NAME = VoiceBot
-PRODUCT_BUNDLE_IDENTIFIER = com.oneoffrepo.voicebot
+PRODUCT_DISPLAY_NAME = VoiceBot by Fungee
+PRODUCT_BUNDLE_IDENTIFIER = llc.fungee.voicebot
 MARKETING_VERSION = 1.0
 CURRENT_PROJECT_VERSION = 1
 
@@ -32,6 +32,7 @@ TARGETED_DEVICE_FAMILY = 1,2
 // Info PLIST
 // ==========================================
 GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_KEY_CFBundleDisplayName = $(PRODUCT_DISPLAY_NAME)
 INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait
 INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
 INFOPLIST_KEY_NSMicrophoneUsageDescription = Voice input is used to capture your prompts for chat conversations.

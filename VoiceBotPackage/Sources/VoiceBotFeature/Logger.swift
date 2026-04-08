@@ -3,7 +3,7 @@ import os.log
 
 /// Centralized logging utility for structured, consistent logging across the app
 public struct AppLogger {
-    private static let subsystem = "com.oneoffrepo.voicebot"
+    private static let subsystem = "llc.fungee.voicebot"
     
     public struct Category {
         public static let app = "app"

@@ -2,7 +2,7 @@ import Foundation
 import os.log
 
 struct ContextWindowManager {
-    private let logger = Logger(subsystem: "com.oneoffrepo.voicebot", category: "context")
+    private let logger = Logger(subsystem: "llc.fungee.voicebot", category: "context")
     
     private let defaultContextLimit = 4096
     

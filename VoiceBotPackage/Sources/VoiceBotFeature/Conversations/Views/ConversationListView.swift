@@ -7,7 +7,7 @@ struct ConversationListView: View {
     @State private var conversations: [ChatConversation] = []
     @State private var searchText = ""
     
-    private let logger = Logger(subsystem: "com.oneoffrepo.voicebot", category: "ui")
+    private let logger = Logger(subsystem: "llc.fungee.voicebot", category: "ui")
     
     let onConversationSelected: (ChatConversation) -> Void
     
