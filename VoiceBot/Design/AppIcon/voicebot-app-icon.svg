@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="132" y1="110" x2="892" y2="922" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#08172F"/>
+      <stop offset="0.56" stop-color="#0E3B78"/>
+      <stop offset="1" stop-color="#0E65C7"/>
+    </linearGradient>
+    <radialGradient id="glowTop" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(278 164) rotate(90) scale(420)">
+      <stop offset="0" stop-color="#8BE9FF" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#8BE9FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowBottom" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(792 846) rotate(90) scale(340)">
+      <stop offset="0" stop-color="#173D7A" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#173D7A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="secondaryBubble" x1="520" y1="248" x2="828" y2="598" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6CE8FF"/>
+      <stop offset="1" stop-color="#2C78FF"/>
+    </linearGradient>
+    <linearGradient id="primaryBubble" x1="190" y1="280" x2="770" y2="824" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F9FBFF"/>
+      <stop offset="1" stop-color="#EAF2FF"/>
+    </linearGradient>
+    <linearGradient id="bars" x1="382" y1="364" x2="644" y2="648" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#249CFF"/>
+      <stop offset="1" stop-color="#4CDEC8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+  <circle cx="278" cy="164" r="420" fill="url(#glowTop)"/>
+  <circle cx="792" cy="846" r="340" fill="url(#glowBottom)"/>
+  <rect x="60" y="60" width="904" height="904" rx="172" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2"/>
+
+  <path
+    d="M590 246H738C795 246 842 293 842 350V440C842 497 795 544 738 544H686L604 608L624 544H590C533 544 486 497 486 440V350C486 293 533 246 590 246Z"
+    fill="url(#secondaryBubble)"
+    opacity="0.24"
+  />
+
+  <path
+    d="M300 296H690C782 296 856 370 856 462V590C856 682 782 756 690 756H532L386 862L418 756H300C208 756 134 682 134 590V462C134 370 208 296 300 296Z"
+    fill="#041326"
+    opacity="0.18"
+    transform="translate(0 20)"
+  />
+  <path
+    d="M300 296H690C782 296 856 370 856 462V590C856 682 782 756 690 756H532L386 862L418 756H300C208 756 134 682 134 590V462C134 370 208 296 300 296Z"
+    fill="url(#primaryBubble)"
+  />
+  <path
+    d="M300 296H690C782 296 856 370 856 462V590C856 682 782 756 690 756H532L386 862L418 756H300C208 756 134 682 134 590V462C134 370 208 296 300 296Z"
+    fill="none"
+    stroke="#D8E4F4"
+    stroke-width="4"
+  />
+  <path
+    d="M334 334H656C736 334 802 400 802 480"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-opacity="0.7"
+    stroke-linecap="round"
+    stroke-width="20"
+  />
+
+  <g transform="translate(0 10)">
+    <rect x="386" y="456" width="68" height="164" rx="34" fill="#113F7F" opacity="0.12"/>
+    <rect x="478" y="374" width="68" height="246" rx="34" fill="#113F7F" opacity="0.12"/>
+    <rect x="570" y="424" width="68" height="196" rx="34" fill="#113F7F" opacity="0.12"/>
+  </g>
+  <rect x="386" y="446" width="68" height="164" rx="34" fill="url(#bars)"/>
+  <rect x="478" y="364" width="68" height="246" rx="34" fill="url(#bars)"/>
+  <rect x="570" y="414" width="68" height="196" rx="34" fill="url(#bars)"/>
+</svg>

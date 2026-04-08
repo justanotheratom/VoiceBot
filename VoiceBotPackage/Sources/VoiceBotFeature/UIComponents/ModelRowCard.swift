@@ -93,10 +93,16 @@ public struct ModelRowCard: View {
                 Label("Downloading", systemImage: "arrow.down.circle.fill")
                     .labelStyle(.iconOnly)
                     .foregroundStyle(.blue)
-            case .failed:
-                Label("Failed", systemImage: "exclamationmark.triangle")
-                    .labelStyle(.iconOnly)
-                    .foregroundStyle(.red)
+            case .failed(let error):
+                VStack(alignment: .trailing, spacing: 2) {
+                    Label("Failed", systemImage: "exclamationmark.triangle")
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(.red)
+                    Text(error)
+                        .font(.system(size: 8))
+                        .foregroundStyle(.red)
+                        .lineLimit(1)
+                }
             case .notStarted:
                 Label("Not Downloaded", systemImage: "cloud")
                     .labelStyle(.iconOnly)
@@ -160,13 +166,21 @@ public struct ModelRowCard: View {
                 }
             }
 
-        case .failed:
-            Button("Retry") {
-                onDownload()
+        case .failed(let error):
+            VStack(alignment: .trailing, spacing: 4) {
+                Button("Retry") {
+                    onDownload()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(.red)
+                
+                Text(error)
+                    .font(.system(size: 8))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .frame(width: 80, alignment: .trailing)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .tint(.red)
 
         case .notStarted:
             Button("Download") {

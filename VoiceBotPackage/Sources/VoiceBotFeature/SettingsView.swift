@@ -323,10 +323,10 @@ public enum DownloadState: Equatable {
     NavigationStack {
         SettingsView(
             currentModel: SelectedModel(
-                slug: "lfm2-350m",
-                displayName: "LFM2 350M",
+                slug: "lfm25-1.2b-instruct",
+                displayName: "LFM2.5 1.2B Instruct",
                 provider: "LiquidAI",
-                quantizationSlug: "lfm2-350m-20250710-8da4w",
+                quantizationSlug: "lfm2.5-1.2b-instruct-8da4w",
                 localURL: URL(string: "file:///some/path"),
                 runtime: .leap
             ),

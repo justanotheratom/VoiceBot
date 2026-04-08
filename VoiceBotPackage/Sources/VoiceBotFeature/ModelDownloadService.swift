@@ -13,7 +13,7 @@ public protocol ModelDownloadServicing: Sendable {
     ) async throws -> ModelDownloadResult
 }
 
-public enum ModelDownloadError: Error, Sendable {
+public enum ModelDownloadError: Error, LocalizedError, Sendable {
     case cancelled
     case insufficientStorage
     case underlying(String)
@@ -22,6 +22,27 @@ public enum ModelDownloadError: Error, Sendable {
     case unsupportedRuntime
     case missingMetadata
     case missingToken
+
+    public var errorDescription: String? {
+        switch self {
+        case .cancelled:
+            return "The download was cancelled."
+        case .insufficientStorage:
+            return "There is not enough storage space for this model."
+        case .underlying(let message):
+            return message
+        case .downloaderUnavailable:
+            return "The model downloader is not available."
+        case .invalidURL:
+            return "The model download URL is invalid."
+        case .unsupportedRuntime:
+            return "This model runtime is not supported."
+        case .missingMetadata:
+            return "The model catalog entry is missing required metadata."
+        case .missingToken:
+            return "A Hugging Face token is required for this model."
+        }
+    }
 }
 
 public struct ModelDownloadService: ModelDownloadServicing {

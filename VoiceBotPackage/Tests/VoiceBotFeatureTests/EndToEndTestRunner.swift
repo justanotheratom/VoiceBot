@@ -102,7 +102,7 @@ struct EndToEndTestRunner {
                     ("Any tips for handling large datasets?",
                      "For large datasets: Implement pagination or virtual scrolling, use lazy loading patterns, consider data preprocessing on background queues, and cache computed values that don't change frequently.")
                 ],
-                modelSlug: "lfm2-700m"
+                modelSlug: "lfm25-1.2b-instruct"
             ),
             
             // Conversation 2: iOS Architecture  
@@ -116,7 +116,7 @@ struct EndToEndTestRunner {
                     ("What about dependency injection?",
                      "Use @Environment for app-wide dependencies like services and configuration. For feature-specific dependencies, pass them as properties. SwiftUI's environment system provides clean dependency injection without complex frameworks.")
                 ],
-                modelSlug: "lfm2-1.2b"
+                modelSlug: "lfm25-1.2b-instruct"
             ),
             
             // Conversation 3: Swift Concurrency
@@ -130,7 +130,7 @@ struct EndToEndTestRunner {
                     ("How do I handle cancellation properly?",
                      "Check Task.isCancelled periodically in long-running operations, use try Task.checkCancellation() to throw if cancelled, and design your async functions to handle CancellationError gracefully. SwiftUI's .task modifier handles cancellation automatically.")
                 ],
-                modelSlug: "lfm2-350m"
+                modelSlug: "lfm25-350m"
             ),
             
             // Conversation 4: Data Persistence
@@ -144,7 +144,7 @@ struct EndToEndTestRunner {
                     ("Are there any limitations I should know about?",
                      "SwiftData limitations: Newer framework with fewer community resources, some advanced Core Data features not yet available, and requires iOS 17+. For complex migration scenarios or legacy projects, Core Data might still be necessary.")
                 ],
-                modelSlug: "lfm2-700m"
+                modelSlug: "gemma4-e2b"
             ),
             
             // Conversation 5: Testing
@@ -158,7 +158,7 @@ struct EndToEndTestRunner {
                     ("What about testing async code?",
                      "With Swift Testing, use async test functions and await async operations directly. Test both success and failure scenarios, verify proper error handling, and use Task.sleep() sparingly for timing-dependent tests.")
                 ],
-                modelSlug: "lfm2-350m"
+                modelSlug: "gemma4-e2b"
             )
         ]
     }

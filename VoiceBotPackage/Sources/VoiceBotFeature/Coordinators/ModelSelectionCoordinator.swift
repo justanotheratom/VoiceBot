@@ -21,7 +21,7 @@ final class ModelSelectionCoordinator {
     init(persistence: PersistenceService = PersistenceService(), storage: ModelStorageService = ModelStorageService()) {
         self.persistence = persistence
         self.storage = storage
-        self.currentModel = persistence.loadSelectedModel()
+        self.currentModel = validatedSelection(from: persistence.loadSelectedModel())
     }
 
     // MARK: - Public API
@@ -66,6 +66,20 @@ final class ModelSelectionCoordinator {
 
     /// Refresh current model from persistence (useful on app resume)
     func refreshModel() {
-        currentModel = persistence.loadSelectedModel()
+        currentModel = validatedSelection(from: persistence.loadSelectedModel())
+    }
+
+    private func validatedSelection(from model: SelectedModel?) -> SelectedModel? {
+        guard let model else {
+            return nil
+        }
+
+        guard ModelCatalog.entry(forSlug: model.slug) != nil else {
+            persistence.clearSelectedModel()
+            AppLogger.ui().log(event: "coordinator:clearStaleSelection", data: ["slug": model.slug])
+            return nil
+        }
+
+        return model
     }
 }

@@ -7,7 +7,7 @@ func conversationRowDisplaysCorrectly() {
     let userMessage = ChatMessageModel(role: .user, content: "What is SwiftUI?")
     let assistantMessage = ChatMessageModel(role: .assistant, content: "SwiftUI is a user interface toolkit...")
     
-    var conversation = ChatConversation(modelSlug: "lfm2-350m", initialMessage: userMessage)
+    var conversation = ChatConversation(modelSlug: "lfm25-1.2b-instruct", initialMessage: userMessage)
     conversation.addMessage(assistantMessage)
     conversation.setTitle("SwiftUI Discussion")
     
@@ -16,7 +16,7 @@ func conversationRowDisplaysCorrectly() {
     #expect(conversation.messages.count == 2)
     #expect(conversation.messages.first?.content == "What is SwiftUI?")
     #expect(conversation.messages.last?.content == "SwiftUI is a user interface toolkit...")
-    #expect(conversation.modelSlug == "lfm2-350m")
+    #expect(conversation.modelSlug == "lfm25-1.2b-instruct")
 }
 
 @Test("ConversationListView filtering works correctly") 
@@ -26,14 +26,14 @@ func conversationListFiltering() {
         title: "SwiftUI Tutorial",
         userContent: "How do I create a SwiftUI view?",
         assistantContent: "To create a SwiftUI view...",
-        modelSlug: "lfm2-350m"
+        modelSlug: "lfm25-1.2b-instruct"
     )
     
     let conversation2 = createTestConversation(
         title: "Python Programming",
         userContent: "What is Python used for?",
         assistantContent: "Python is used for many things...",
-        modelSlug: "lfm2-700m"
+        modelSlug: "lfm25-1.2b-instruct"
     )
     
     let conversations = [conversation1, conversation2]
@@ -60,7 +60,7 @@ func conversationServicePersistence() throws {
         title: "Test Conversation",
         userContent: "Hello, how are you?",
         assistantContent: "I'm doing well, thank you!",
-        modelSlug: "lfm2-1.2b"
+        modelSlug: "lfm25-1.2b-instruct"
     )
     
     // Save conversation
@@ -73,7 +73,7 @@ func conversationServicePersistence() throws {
     #expect(loadedConversation.id == testConversation.id)
     #expect(loadedConversation.title == "Test Conversation")
     #expect(loadedConversation.messages.count == 2)
-    #expect(loadedConversation.modelSlug == "lfm2-1.2b")
+    #expect(loadedConversation.modelSlug == "lfm25-1.2b-instruct")
     
     // Test loading all conversations includes our test conversation
     let allConversations = service.loadAllConversations()
@@ -102,14 +102,14 @@ func conversationServiceSearchFunctionality() throws {
         title: "iOS Development",
         userContent: "How to build iOS apps?",
         assistantContent: "To build iOS apps, you need Xcode...",
-        modelSlug: "lfm2-350m"
+        modelSlug: "lfm25-1.2b-instruct"
     )
     
     let conversation2 = createTestConversation(
         title: "Web Development", 
         userContent: "What is React?",
         assistantContent: "React is a JavaScript library...",
-        modelSlug: "lfm2-700m"
+        modelSlug: "lfm25-1.2b-instruct"
     )
     
     // Save conversations

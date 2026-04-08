@@ -11,10 +11,10 @@ func conversationManagerNewConversation() {
     #expect(manager.currentConversation == nil)
     #expect(manager.needsTitleGeneration == false)
     
-    manager.startNewConversation(modelSlug: "lfm2-350m")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     
     #expect(manager.currentConversation != nil)
-    #expect(manager.currentConversation?.modelSlug == "lfm2-350m")
+    #expect(manager.currentConversation?.modelSlug == "lfm25-1.2b-instruct")
     #expect(manager.needsTitleGeneration == false)
 }
 
@@ -24,11 +24,11 @@ func conversationManagerAddUserMessage() {
     let mockRuntimeService = ModelRuntimeService()
     let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
-    manager.startNewConversation(modelSlug: "lfm2-350m")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     manager.addUserMessage("Hello, how are you?")
     
     let messages = manager.getMessagesForLLM()
-    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm25-1.2b-instruct")?.systemPrompt
     if let systemPrompt {
         #expect(messages.count == 2)
         #expect(messages.first?.role == .system)
@@ -48,7 +48,7 @@ func conversationManagerAddAssistantMessage() async {
     let mockRuntimeService = ModelRuntimeService()
     let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
-    manager.startNewConversation(modelSlug: "lfm2-350m")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     manager.addUserMessage("Hello, how are you?")
     
     #expect(manager.needsTitleGeneration == false)
@@ -56,7 +56,7 @@ func conversationManagerAddAssistantMessage() async {
     await manager.addAssistantMessage("I'm doing well, thank you!")
     
     let messages = manager.getMessagesForLLM()
-    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm25-1.2b-instruct")?.systemPrompt
     let expectedCount = (systemPrompt == nil ? 0 : 1) + 2 // system? + user + assistant
     #expect(messages.count == expectedCount)
     #expect(messages.last?.role == .assistant)
@@ -75,7 +75,7 @@ func conversationManagerLoadConversation() {
     // Create test conversation
     let userMessage = ChatMessageModel(role: .user, content: "Test message")
     let assistantMessage = ChatMessageModel(role: .assistant, content: "Test response")
-    var testConversation = ChatConversation(modelSlug: "lfm2-700m", initialMessage: userMessage)
+    var testConversation = ChatConversation(modelSlug: "lfm25-1.2b-instruct", initialMessage: userMessage)
     testConversation.addMessage(assistantMessage)
     testConversation.setTitle("Test Conversation")
     
@@ -83,7 +83,7 @@ func conversationManagerLoadConversation() {
     
     #expect(manager.currentConversation?.id == testConversation.id)
     #expect(manager.currentConversation?.title == "Test Conversation")
-    #expect(manager.currentConversation?.modelSlug == "lfm2-700m")
+    #expect(manager.currentConversation?.modelSlug == "lfm25-1.2b-instruct")
     
     let messages = manager.getAllMessagesForDisplay()
     #expect(messages.count == 2)

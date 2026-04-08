@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="118" y1="98" x2="910" y2="930" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#040C18"/>
+      <stop offset="0.56" stop-color="#0A2448"/>
+      <stop offset="1" stop-color="#0A57B5"/>
+    </linearGradient>
+    <radialGradient id="glowTop" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(300 148) rotate(90) scale(390)">
+      <stop offset="0" stop-color="#5AE7FF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#5AE7FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="secondaryBubble" x1="518" y1="246" x2="830" y2="602" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#78F0FF"/>
+      <stop offset="1" stop-color="#2D7FFF"/>
+    </linearGradient>
+    <linearGradient id="primaryBubble" x1="178" y1="292" x2="774" y2="818" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FCFF"/>
+      <stop offset="1" stop-color="#DCEBFF"/>
+    </linearGradient>
+    <linearGradient id="bars" x1="380" y1="360" x2="648" y2="648" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#37B0FF"/>
+      <stop offset="1" stop-color="#65F0CC"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+  <circle cx="300" cy="148" r="390" fill="url(#glowTop)"/>
+  <rect x="60" y="60" width="904" height="904" rx="172" fill="none" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="2"/>
+
+  <path
+    d="M590 246H738C795 246 842 293 842 350V440C842 497 795 544 738 544H686L604 608L624 544H590C533 544 486 497 486 440V350C486 293 533 246 590 246Z"
+    fill="url(#secondaryBubble)"
+    opacity="0.28"
+  />
+
+  <path
+    d="M300 296H690C782 296 856 370 856 462V590C856 682 782 756 690 756H532L386 862L418 756H300C208 756 134 682 134 590V462C134 370 208 296 300 296Z"
+    fill="#020A16"
+    opacity="0.26"
+    transform="translate(0 20)"
+  />
+  <path
+    d="M300 296H690C782 296 856 370 856 462V590C856 682 782 756 690 756H532L386 862L418 756H300C208 756 134 682 134 590V462C134 370 208 296 300 296Z"
+    fill="url(#primaryBubble)"
+  />
+  <path
+    d="M300 296H690C782 296 856 370 856 462V590C856 682 782 756 690 756H532L386 862L418 756H300C208 756 134 682 134 590V462C134 370 208 296 300 296Z"
+    fill="none"
+    stroke="#D8E4F6"
+    stroke-width="4"
+  />
+  <path
+    d="M336 336H658C738 336 804 402 804 482"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-opacity="0.64"
+    stroke-linecap="round"
+    stroke-width="18"
+  />
+
+  <g transform="translate(0 10)">
+    <rect x="386" y="456" width="68" height="164" rx="34" fill="#071A34" opacity="0.16"/>
+    <rect x="478" y="374" width="68" height="246" rx="34" fill="#071A34" opacity="0.16"/>
+    <rect x="570" y="424" width="68" height="196" rx="34" fill="#071A34" opacity="0.16"/>
+  </g>
+  <rect x="386" y="446" width="68" height="164" rx="34" fill="url(#bars)"/>
+  <rect x="478" y="364" width="68" height="246" rx="34" fill="url(#bars)"/>
+  <rect x="570" y="414" width="68" height="196" rx="34" fill="url(#bars)"/>
+</svg>

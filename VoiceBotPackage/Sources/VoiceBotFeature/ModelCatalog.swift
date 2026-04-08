@@ -84,14 +84,41 @@ public enum ModelCatalog {
     public static let all: [ModelCatalogEntry] = [
         ModelCatalogEntry(
             id: "lfm25-350m",
-            displayName: "LFM2.5 350M",
+            displayName: "LFM2.5 350M Instruct",
             provider: "LiquidAI",
             slug: "lfm25-350m",
-            quantizationSlug: "lfm2.5-350m-8da4w",
-            estDownloadMB: 322,
-            contextWindow: 8192,
-            shortDescription: "Latest LFM2.5 text model; ultra-high token-to-parameter ratio",
-            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2.5-350M-8da4w_output_8da8w-seq_8192.bundle?download=true",
+            quantizationSlug: nil,
+            estDownloadMB: 222,
+            contextWindow: 128_000,
+            shortDescription: "Smallest instruct-tuned LFM2.5 variant available in the current catalog",
+            downloadURLString: nil,
+            runtime: .mlx,
+            gemmaMetadata: .init(
+                assetIdentifier: "lfm25-350m-4bit",
+                repoID: "LiquidAI/LFM2.5-350M-MLX-4bit",
+                revision: "main",
+                primaryFilePath: "model.safetensors",
+                matchingGlobs: [
+                    "chat_template.jinja",
+                    "config.json",
+                    "generation_config.json",
+                    "model.safetensors",
+                    "model.safetensors.index.json",
+                    "tokenizer.json",
+                    "tokenizer_config.json"
+                ]
+            )
+        ),
+        ModelCatalogEntry(
+            id: "lfm25-1.2b-instruct",
+            displayName: "LFM2.5 1.2B Instruct",
+            provider: "LiquidAI",
+            slug: "lfm25-1.2b-instruct",
+            quantizationSlug: "lfm2.5-1.2b-instruct-8da4w",
+            estDownloadMB: 924,
+            contextWindow: 4096,
+            shortDescription: "Instruction-tuned LFM2.5 model published for the Leap runtime",
+            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2.5-1.2B-Instruct-8da4w_output_8da8w-seq_4096.bundle?download=true",
             runtime: .leap
         ),
         ModelCatalogEntry(
@@ -100,9 +127,9 @@ public enum ModelCatalog {
             provider: "Google",
             slug: "gemma4-e2b",
             quantizationSlug: nil,
-            estDownloadMB: 1_600,
+            estDownloadMB: 3_613,
             contextWindow: 128_000,
-            shortDescription: "Multimodal-capable Gemma 4 E2B with reasoning mode via MLX runtime",
+            shortDescription: "Smallest Gemma 4 MLX model currently available",
             downloadURLString: nil,
             runtime: .mlx,
             gemmaMetadata: .init(
@@ -111,174 +138,17 @@ public enum ModelCatalog {
                 revision: "main",
                 primaryFilePath: "model.safetensors",
                 matchingGlobs: [
+                    "chat_template.jinja",
                     "config.json",
                     "generation_config.json",
-                    "tokenizer.json",
-                    "tokenizer_config.json",
-                    "special_tokens_map.json",
-                    "preprocessor_config.json",
-                    "processor_config.json",
-                    "chat_template.jinja",
-                    "tokenizer.model",
+                    "model.safetensors",
                     "model.safetensors.index.json",
-                    "model.safetensors"
+                    "processor_config.json",
+                    "tokenizer.json",
+                    "tokenizer_config.json"
                 ]
             ),
             systemPrompt: "You are an advanced on-device assistant using Gemma 4. Use step-by-step reasoning for complex queries. Answer directly and concisely otherwise."
-        ),
-        ModelCatalogEntry(
-            id: "lfm2-350m",
-            displayName: "LFM2 350M",
-            provider: "LiquidAI",
-            slug: "lfm2-350m",
-            quantizationSlug: "lfm2-350m-20250710-8da4w",
-            estDownloadMB: 322,
-            contextWindow: 4096,
-            shortDescription: "Smallest LFM2 text model; fastest on-device option",
-            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2-350M-8da4w_output_8da8w-seq_4096.bundle?download=true",
-            runtime: .leap
-        ),
-        ModelCatalogEntry(
-            id: "lfm2-700m",
-            displayName: "LFM2 700M",
-            provider: "LiquidAI",
-            slug: "lfm2-700m",
-            quantizationSlug: "lfm2-700m-20250710-8da4w",
-            estDownloadMB: 610,
-            contextWindow: 4096,
-            shortDescription: "Balanced quality vs size; still mobile-friendly",
-            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2-700M-8da4w_output_8da8w-seq_4096.bundle?download=true",
-            runtime: .leap
-        ),
-        ModelCatalogEntry(
-            id: "lfm2-1.2b",
-            displayName: "LFM2 1.2B",
-            provider: "LiquidAI",
-            slug: "lfm2-1.2b",
-            quantizationSlug: "lfm2-1.2b-20250710-8da4w",
-            estDownloadMB: 924,
-            contextWindow: 4096,
-            shortDescription: "Higher quality; larger footprint on mobile",
-            downloadURLString: "https://huggingface.co/LiquidAI/LeapBundles/resolve/main/LFM2-1.2B-8da4w_output_8da8w-seq_4096.bundle?download=true",
-            runtime: .leap
-        ),
-        ModelCatalogEntry(
-            id: "gemma3-1b",
-            displayName: "Gemma 3 1B IT",
-            provider: "Google",
-            slug: "gemma3-1b",
-            quantizationSlug: nil,
-            estDownloadMB: 530,
-            contextWindow: 8192,
-            shortDescription: "Larger Gemma 3 instruction-tuned model via MLX runtime",
-            downloadURLString: nil,
-            runtime: .mlx,
-            gemmaMetadata: .init(
-                assetIdentifier: "gemma3-1b-4bit",
-                repoID: "mlx-community/gemma-3-1b-it-4bit",
-                revision: "main",
-                primaryFilePath: "model.safetensors",
-                matchingGlobs: [
-                    "model.safetensors",
-                    "model.safetensors.index.json",
-                    "tokenizer.json",
-                    "tokenizer.model",
-                    "tokenizer_config.json",
-                    "config.json",
-                    "special_tokens_map.json",
-                    "added_tokens.json",
-                    "preprocessor_config.json"
-                ]
-            ),
-            systemPrompt: "You are Gemma, an on-device assistant. Answer user questions directly with a short, factual reply. Do not repeat phrases or re-state that you are answering; simply provide the response and stop."
-        ),
-        ModelCatalogEntry(
-            id: "gemma3n-e2b",
-            displayName: "Gemma 3n E2B IT",
-            provider: "Google",
-            slug: "gemma3n-e2b",
-            quantizationSlug: nil,
-            estDownloadMB: 1_596,
-            contextWindow: 32_768,
-            shortDescription: "Multimodal-capable Gemma 3n E2B running via MLX runtime",
-            downloadURLString: nil,
-            runtime: .mlx,
-            gemmaMetadata: .init(
-                assetIdentifier: "gemma3n-e2b-4bit",
-                repoID: "mlx-community/gemma-3n-E2B-it-4bit",
-                revision: "main",
-                primaryFilePath: "model.safetensors",
-                matchingGlobs: [
-                    "config.json",
-                    "generation_config.json",
-                    "tokenizer.json",
-                    "tokenizer_config.json",
-                    "special_tokens_map.json",
-                    "preprocessor_config.json",
-                    "processor_config.json",
-                    "chat_template.jinja",
-                    "tokenizer.model",
-                    "model.safetensors.index.json",
-                    "model.safetensors"
-                ]
-            ),
-            systemPrompt: "You are Gemma, an on-device assistant. Answer user questions directly with a short, factual reply. Do not repeat phrases or re-state that you are answering; simply provide the response and stop."
-        ),
-        ModelCatalogEntry(
-            id: "gemma3-270m",
-            displayName: "Gemma 3 270M IT",
-            provider: "Google",
-            slug: "gemma3-270m",
-            quantizationSlug: nil,
-            estDownloadMB: 145,
-            contextWindow: 8192,
-            shortDescription: "Instruction-tuned Gemma 3 running via MLX runtime",
-            downloadURLString: nil,
-            runtime: .mlx,
-            gemmaMetadata: .init(
-                assetIdentifier: "gemma3-270m-4bit",
-                repoID: "mlx-community/gemma-3-270m-it-4bit",
-                revision: "main",
-                primaryFilePath: "model.safetensors",
-                matchingGlobs: [
-                    "model.safetensors",
-                    "tokenizer.json",
-                    "tokenizer_config.json",
-                    "config.json",
-                    "generation_config.json",
-                    "special_tokens_map.json"
-                ]
-            ),
-            systemPrompt: "You are Gemma, an on-device assistant. Answer user questions directly with a short, factual reply. Do not repeat phrases or re-state that you are answering; simply provide the response and stop."
-        ),
-        ModelCatalogEntry(
-            id: "lfm2-350m-mlx",
-            displayName: "LFM2 350M (MLX)",
-            provider: "LiquidAI",
-            slug: "lfm2-350m-mlx",
-            quantizationSlug: nil,
-            estDownloadMB: 204,
-            contextWindow: 4096,
-            shortDescription: "LFM2 350M 4-bit running via MLX runtime",
-            downloadURLString: nil,
-            runtime: .mlx,
-            gemmaMetadata: .init(
-                assetIdentifier: "lfm2-350m-4bit",
-                repoID: "mlx-community/LFM2-350M-4bit",
-                revision: "main",
-                primaryFilePath: "model.safetensors",
-                matchingGlobs: [
-                    "model.safetensors",
-                    "model.safetensors.index.json",
-                    "tokenizer.json",
-                    "tokenizer_config.json",
-                    "config.json",
-                    "generation_config.json",
-                    "special_tokens_map.json",
-                    "chat_template.jinja"
-                ]
-            ),
-            systemPrompt: nil
         )
     ]
 

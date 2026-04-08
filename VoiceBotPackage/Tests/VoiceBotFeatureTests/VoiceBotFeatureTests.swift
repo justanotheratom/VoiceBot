@@ -5,9 +5,9 @@ import Foundation
 @Test("ModelCatalog has curated entries")
 func catalogEntries() {
     #expect(!ModelCatalog.all.isEmpty)
-    #expect(ModelCatalog.entry(forSlug: "lfm2-350m")?.displayName.contains("LFM2") == true)
-    #expect(ModelCatalog.entry(forSlug: "gemma3-270m")?.runtime == .mlx)
-    #expect(ModelCatalog.entry(forSlug: "gemma3n-e2b")?.runtime == .mlx)
+    #expect(ModelCatalog.entry(forSlug: "lfm25-1.2b-instruct")?.displayName.contains("LFM2.5") == true)
+    #expect(ModelCatalog.entry(forSlug: "lfm25-350m")?.runtime == .mlx)
+    #expect(ModelCatalog.entry(forSlug: "gemma4-e2b")?.runtime == .mlx)
 }
 
 @Test("SelectedModel encodes and decodes via JSON")
@@ -128,7 +128,7 @@ func modelCatalogConsistency() {
     let entries = ModelCatalog.all
     
     // Check we have expected models
-    #expect(entries.count >= 5)
+    #expect(entries.count >= 3)
     
     // Check all entries have required fields
     for entry in entries {
@@ -314,21 +314,19 @@ func contextWindowManagerLimits() {
     let manager = ContextWindowManager()
     
     // Test known models
-    #expect(manager.getContextLimit(for: "lfm2-350m") == ModelCatalog.entry(forSlug: "lfm2-350m")?.contextWindow)
-    #expect(manager.getContextLimit(for: "lfm2-700m") == ModelCatalog.entry(forSlug: "lfm2-700m")?.contextWindow)
-    #expect(manager.getContextLimit(for: "lfm2-1.2b") == ModelCatalog.entry(forSlug: "lfm2-1.2b")?.contextWindow)
-    #expect(manager.getContextLimit(for: "gemma3-270m") == ModelCatalog.entry(forSlug: "gemma3-270m")?.contextWindow)
-    #expect(manager.getContextLimit(for: "gemma3n-e2b") == ModelCatalog.entry(forSlug: "gemma3n-e2b")?.contextWindow)
+    #expect(manager.getContextLimit(for: "lfm25-1.2b-instruct") == ModelCatalog.entry(forSlug: "lfm25-1.2b-instruct")?.contextWindow)
+    #expect(manager.getContextLimit(for: "lfm25-350m") == ModelCatalog.entry(forSlug: "lfm25-350m")?.contextWindow)
+    #expect(manager.getContextLimit(for: "gemma4-e2b") == ModelCatalog.entry(forSlug: "gemma4-e2b")?.contextWindow)
     
-    let baseLimit = manager.getContextLimit(for: "lfm2-350m")
-    let responseBudget = manager.responseTokenBudget(for: "lfm2-350m")
+    let baseLimit = manager.getContextLimit(for: "lfm25-1.2b-instruct")
+    let responseBudget = manager.responseTokenBudget(for: "lfm25-1.2b-instruct")
     #expect(responseBudget == Int(Double(baseLimit) * 0.30))
 
-    let gemmaBudget = manager.responseTokenBudget(for: "gemma3-270m")
-    #expect(gemmaBudget == 512)
+    let smallBudget = manager.responseTokenBudget(for: "lfm25-350m")
+    #expect(smallBudget == 512)
 
-    let gemmaE2BBudget = manager.responseTokenBudget(for: "gemma3n-e2b")
-    #expect(gemmaE2BBudget == 512)
+    let gemmaBudget = manager.responseTokenBudget(for: "gemma4-e2b")
+    #expect(gemmaBudget == 512)
     
     // Test unknown model defaults to 4096
     #expect(manager.getContextLimit(for: "unknown-model") == 4096)
@@ -340,7 +338,7 @@ func contextWindowManagerArchiving() {
     let manager = ContextWindowManager()
     
     // Create a conversation with many messages to trigger archiving
-    var conversation = ChatConversation(modelSlug: "lfm2-350m")
+    var conversation = ChatConversation(modelSlug: "lfm25-1.2b-instruct")
     
     // Add messages that would exceed 70% of available context
     // Available for history: 4096 - (4096 * 0.3) = 2867 tokens
@@ -364,7 +362,7 @@ func contextWindowManagerArchiving() {
 @Test("ContextWindowManager preserves recent messages")
 func contextWindowManagerPreservesRecent() {
     let manager = ContextWindowManager()
-    var conversation = ChatConversation(modelSlug: "lfm2-350m")
+    var conversation = ChatConversation(modelSlug: "lfm25-1.2b-instruct")
     
     // Add old messages
     for i in 1...10 {
@@ -503,6 +501,62 @@ func gemmaConfigNormalizerFlattensIntermediateSize() throws {
     #expect(headerJSON?["language_model.embed_tokens.weight"] != nil)
     #expect(headerJSON?["language_model.norm.weight"] != nil)
     #expect(headerJSON?["language_model.altup_unembed_projections.0.weight"] != nil)
+}
+
+@Test("Gemma config normalizer repairs LFM2 quantization and attention metadata")
+func gemmaConfigNormalizerRepairsLFM2Config() throws {
+    let tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+
+    let configURL = tempDirectory.appendingPathComponent("config.json")
+    let tokenizerConfigURL = tempDirectory.appendingPathComponent("tokenizer_config.json")
+    let payload: [String: Any] = [
+        "model_type": "lfm2",
+        "quantization": [
+            "group_size": 64,
+            "bits": 4,
+            "mode": "affine"
+        ],
+        "quantization_config": [
+            "group_size": 64,
+            "bits": 4,
+            "mode": "affine"
+        ],
+        "layer_types": [
+            "conv",
+            "conv",
+            "full_attention",
+            "conv",
+            "full_attention"
+        ]
+    ]
+
+    let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted])
+    try data.write(to: configURL)
+
+    let tokenizerPayload: [String: Any] = [
+        "tokenizer_class": "TokenizersBackend",
+        "backend": "tokenizers"
+    ]
+    let tokenizerData = try JSONSerialization.data(withJSONObject: tokenizerPayload, options: [.prettyPrinted])
+    try tokenizerData.write(to: tokenizerConfigURL)
+
+    GemmaConfigNormalizer.normalizeIfNeeded(in: tempDirectory)
+
+    let normalizedData = try Data(contentsOf: configURL)
+    let decoded = try JSONSerialization.jsonObject(with: normalizedData) as? [String: Any]
+    let quantization = decoded?["quantization"] as? [String: Any]
+    let quantizationConfig = decoded?["quantization_config"] as? [String: Any]
+    let fullAttentionIndices = decoded?["full_attn_idxs"] as? [Int]
+    let normalizedTokenizerData = try Data(contentsOf: tokenizerConfigURL)
+    let normalizedTokenizer = try JSONSerialization.jsonObject(with: normalizedTokenizerData) as? [String: Any]
+
+    #expect(quantization?["mode"] == nil)
+    #expect(quantization?["quantization_mode"] as? String == "affine")
+    #expect(quantizationConfig?["mode"] == nil)
+    #expect(quantizationConfig?["quantization_mode"] as? String == "affine")
+    #expect(fullAttentionIndices == [2, 4])
+    #expect(normalizedTokenizer?["tokenizer_class"] as? String == "PreTrainedTokenizer")
 }
 
 @Test("TitleGenerationService fallback title generation")
