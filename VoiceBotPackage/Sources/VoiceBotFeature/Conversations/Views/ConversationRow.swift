@@ -59,7 +59,7 @@ struct ConversationRow: View {
 #if DEBUG
 #Preview {
     let sampleMessage = ChatMessageModel(role: .user, content: "What is SwiftUI and how does it work?")
-    var sampleConversation = ChatConversation(modelSlug: "lfm2-350m", initialMessage: sampleMessage)
+    var sampleConversation = ChatConversation(modelSlug: "lfm25-1.2b-instruct", initialMessage: sampleMessage)
     sampleConversation.setTitle("SwiftUI Discussion")
     
     return List {

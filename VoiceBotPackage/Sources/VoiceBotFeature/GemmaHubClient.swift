@@ -3,14 +3,8 @@ import OSLog
 @preconcurrency import Hub
 
 enum GemmaHubClient {
-    enum Error: Swift.Error, Sendable {
-        case missingToken
-    }
-
     static func shared() throws -> HubApi {
-        guard let token = GemmaHubTokenProvider.huggingFaceToken() else {
-            throw Error.missingToken
-        }
+        let token = GemmaHubTokenProvider.huggingFaceToken()
 
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
         let base = caches?.appendingPathComponent("huggingface", isDirectory: true)
@@ -44,7 +38,7 @@ enum GemmaHubTokenProvider {
             return infoValue
         }
 
-        logger.error("No Hugging Face token configured. Add LFM2ONIOS_HF_TOKEN to the environment, Environment.plist, or Info.plist")
+        logger.notice("No Hugging Face token configured. Continuing with anonymous Hub access")
         return nil
     }
 

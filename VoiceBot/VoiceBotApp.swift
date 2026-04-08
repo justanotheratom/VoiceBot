@@ -13,7 +13,7 @@ struct VoiceBotApp: App {
             AppLogger.app().log(event: "cleanReset:init")
         }
         if let idx = args.firstIndex(of: "--ui-test-autoselect") {
-            let slug = args.indices.contains(idx + 1) ? args[idx + 1] : "lfm2-350m"
+            let slug = args.indices.contains(idx + 1) ? args[idx + 1] : "lfm25-1.2b-instruct"
             if let entry = ModelCatalog.entry(forSlug: slug) {
                 let storage = ModelStorageService()
                 do {
@@ -52,7 +52,7 @@ struct VoiceBotApp: App {
                     // Optional auto-select for automated runs: --ui-test-autoselect <slug>
                     let args = ProcessInfo.processInfo.arguments
                     if let idx = args.firstIndex(of: "--ui-test-autoselect") {
-                        let slug = args.indices.contains(idx + 1) ? args[idx + 1] : "lfm2-350m"
+                        let slug = args.indices.contains(idx + 1) ? args[idx + 1] : "lfm25-1.2b-instruct"
                         if let entry = ModelCatalog.entry(forSlug: slug) {
                             let storage = ModelStorageService()
                             do {

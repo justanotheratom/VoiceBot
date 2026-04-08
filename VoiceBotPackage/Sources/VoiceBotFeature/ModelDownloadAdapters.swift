@@ -129,13 +129,7 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
         progress(0)
 
         let repo = Hub.Repo(id: metadata.repoID)
-        let hub: HubApi
-        do {
-            hub = try hubProvider()
-        } catch is GemmaHubClient.Error {
-            AppLogger.download().log(event: "gemma:missingToken", level: .error)
-            throw ModelDownloadError.missingToken
-        }
+        let hub = try hubProvider()
 
         let snapshotURL: URL
         var usedSnapshotArchive = true
@@ -269,9 +263,7 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
         destinationDirectory: URL,
         progress: @Sendable @escaping (Double) -> Void
     ) async throws -> URL {
-        guard let token = GemmaHubTokenProvider.huggingFaceToken() else {
-            throw ModelDownloadError.missingToken
-        }
+        let token = GemmaHubTokenProvider.huggingFaceToken()
 
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
@@ -289,7 +281,9 @@ struct GemmaModelDownloadAdapter: RuntimeModelDownloadAdapting {
             }
 
             var request = URLRequest(url: url)
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            if let token {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
 
             let start = DispatchTime.now()
             AppLogger.download().log(event: "gemma:directFileStart", data: [

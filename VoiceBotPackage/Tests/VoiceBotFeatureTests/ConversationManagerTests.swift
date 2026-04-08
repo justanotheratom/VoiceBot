@@ -2,33 +2,33 @@ import Testing
 import Foundation
 @testable import VoiceBotFeature
 
-@Test("ConversationManager creates new conversation correctly")
+@Test("ConversationStore creates new conversation correctly")
 @MainActor
 func conversationManagerNewConversation() {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
     #expect(manager.currentConversation == nil)
     #expect(manager.needsTitleGeneration == false)
     
-    manager.startNewConversation(modelSlug: "lfm2-350m")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     
     #expect(manager.currentConversation != nil)
-    #expect(manager.currentConversation?.modelSlug == "lfm2-350m")
+    #expect(manager.currentConversation?.modelSlug == "lfm25-1.2b-instruct")
     #expect(manager.needsTitleGeneration == false)
 }
 
-@Test("ConversationManager adds user messages correctly")
+@Test("ConversationStore adds user messages correctly")
 @MainActor
 func conversationManagerAddUserMessage() {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
-    manager.startNewConversation(modelSlug: "lfm2-350m")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     manager.addUserMessage("Hello, how are you?")
     
     let messages = manager.getMessagesForLLM()
-    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm25-1.2b-instruct")?.systemPrompt
     if let systemPrompt {
         #expect(messages.count == 2)
         #expect(messages.first?.role == .system)
@@ -42,13 +42,13 @@ func conversationManagerAddUserMessage() {
     }
 }
 
-@Test("ConversationManager adds assistant messages and triggers title generation")
+@Test("ConversationStore adds assistant messages and triggers title generation")
 @MainActor
 func conversationManagerAddAssistantMessage() async {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
-    manager.startNewConversation(modelSlug: "lfm2-350m")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     manager.addUserMessage("Hello, how are you?")
     
     #expect(manager.needsTitleGeneration == false)
@@ -56,7 +56,7 @@ func conversationManagerAddAssistantMessage() async {
     await manager.addAssistantMessage("I'm doing well, thank you!")
     
     let messages = manager.getMessagesForLLM()
-    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm25-1.2b-instruct")?.systemPrompt
     let expectedCount = (systemPrompt == nil ? 0 : 1) + 2 // system? + user + assistant
     #expect(messages.count == expectedCount)
     #expect(messages.last?.role == .assistant)
@@ -66,16 +66,16 @@ func conversationManagerAddAssistantMessage() async {
     #expect(manager.needsTitleGeneration == true)
 }
 
-@Test("ConversationManager loads existing conversation")
+@Test("ConversationStore loads existing conversation")
 @MainActor
 func conversationManagerLoadConversation() {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
     // Create test conversation
     let userMessage = ChatMessageModel(role: .user, content: "Test message")
     let assistantMessage = ChatMessageModel(role: .assistant, content: "Test response")
-    var testConversation = ChatConversation(modelSlug: "lfm2-700m", initialMessage: userMessage)
+    var testConversation = ChatConversation(modelSlug: "lfm25-1.2b-instruct", initialMessage: userMessage)
     testConversation.addMessage(assistantMessage)
     testConversation.setTitle("Test Conversation")
     
@@ -83,7 +83,7 @@ func conversationManagerLoadConversation() {
     
     #expect(manager.currentConversation?.id == testConversation.id)
     #expect(manager.currentConversation?.title == "Test Conversation")
-    #expect(manager.currentConversation?.modelSlug == "lfm2-700m")
+    #expect(manager.currentConversation?.modelSlug == "lfm25-1.2b-instruct")
     
     let messages = manager.getAllMessagesForDisplay()
     #expect(messages.count == 2)
@@ -91,22 +91,22 @@ func conversationManagerLoadConversation() {
     #expect(messages.last?.content == "Test response")
 }
 
-@Test("ConversationManager handles empty state correctly")
+@Test("ConversationStore handles empty state correctly")
 @MainActor
 func conversationManagerEmptyState() {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
     #expect(manager.getMessagesForLLM().isEmpty)
     #expect(manager.getAllMessagesForDisplay().isEmpty)
     #expect(manager.currentConversation == nil)
 }
 
-@Test("ConversationManager creates conversation for orphan user message")
+@Test("ConversationStore creates conversation for orphan user message")
 @MainActor
 func conversationManagerOrphanUserMessage() {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
     #expect(manager.currentConversation == nil)
     

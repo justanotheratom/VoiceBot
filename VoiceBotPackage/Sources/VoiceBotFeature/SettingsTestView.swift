@@ -4,12 +4,12 @@ import SwiftUI
 @MainActor
 public struct SettingsTestView: View {
     @State private var downloadStates: [String: DownloadState] = [
-        "lfm2-350m": .downloaded(localURL: URL(string: "file://test")!),
-        "lfm2-700m": .downloaded(localURL: URL(string: "file://test")!),
-        "lfm2-1.2b": .downloaded(localURL: URL(string: "file://test")!)
+        "lfm25-350m": .downloaded(localURL: URL(string: "file://test")!),
+        "lfm25-1.2b-instruct": .downloaded(localURL: URL(string: "file://test")!),
+        "gemma4-e2b": .downloaded(localURL: URL(string: "file://test")!)
     ]
     
-    @State private var selectedModelSlug: String = "lfm2-350m"
+    @State private var selectedModelSlug: String = "lfm25-1.2b-instruct"
     
     private var currentModel: SelectedModel? {
         guard let entry = ModelCatalog.all.first(where: { $0.slug == selectedModelSlug }) else {
@@ -34,7 +34,9 @@ public struct SettingsTestView: View {
                 // Current model section
                 if let current = currentModel {
                     Section {
-                        CurrentModelRow(model: current)
+                        CurrentModelRow(model: current) {
+                            deleteModel(current.slug)
+                        }
                     } header: {
                         Text("Current Model")
                     }

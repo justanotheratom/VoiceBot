@@ -34,9 +34,12 @@ struct ChatView: View {
     private var messagesView: some View {
         TabView(selection: $currentPairIndex) {
             ForEach(Array(messagePairs.enumerated()), id: \.offset) { pairIndex, pair in
+                let userMessage = pairUserMessage(in: pair)
+                let assistantMessages = pairAssistantMessages(in: pair)
+
                 VStack(spacing: 0) {
                     // Pinned user message at top
-                    if let userMessage = pair.first(where: { $0.role == .user }) {
+                    if let userMessage {
                         VStack(spacing: 12) {
                             ChatMessageView(message: userMessage, isStreaming: false)
                                 .accessibilityIdentifier("message_\(userMessage.id.uuidString)")
@@ -44,13 +47,13 @@ struct ChatView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
-                        .background(Color(uiColor: .systemBackground))
+                        .background(.background)
                     }
 
                     // Scrollable assistant response
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            ForEach(pair.filter { $0.role == .assistant }, id: \.id) { msg in
+                            ForEach(assistantMessages, id: \.id) { msg in
                                 ChatMessageView(message: msg, isStreaming: isStreaming && msg.id == messages.last?.id)
                                     .accessibilityIdentifier("message_\(msg.id.uuidString)")
                                     .id(msg.id)
@@ -60,12 +63,16 @@ struct ChatView: View {
                         .padding(.vertical, 12)
                     }
                     .scrollIndicators(.hidden)
+                    #if os(iOS)
                     .scrollDismissesKeyboard(.interactively)
+                    #endif
                 }
                 .tag(pairIndex)
             }
         }
+        #if os(iOS)
         .tabViewStyle(.page(indexDisplayMode: .never))
+        #endif
         .animation(.smooth(duration: 0.4), value: currentPairIndex)
         .onChange(of: messages.count) { oldCount, newCount in
             // Smooth transition to latest pair when new message is added
@@ -108,6 +115,14 @@ struct ChatView: View {
 
     private var latestMessagePair: [Message] {
         messagePairs.last ?? []
+    }
+
+    private func pairUserMessage(in pair: [Message]) -> Message? {
+        pair.first(where: { $0.role == .user })
+    }
+
+    private func pairAssistantMessages(in pair: [Message]) -> [Message] {
+        pair.filter { $0.role == .assistant }
     }
 
     var body: some View {

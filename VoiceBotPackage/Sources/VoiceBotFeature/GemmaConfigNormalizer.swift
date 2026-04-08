@@ -3,6 +3,7 @@ import Foundation
 struct GemmaConfigNormalizer {
     static func normalizeIfNeeded(in directory: URL) {
         normalizeConfig(in: directory)
+        normalizeTokenizerConfig(in: directory)
         normalizeIndex(in: directory)
         normalizeModelShard(in: directory)
     }
@@ -17,6 +18,14 @@ struct GemmaConfigNormalizer {
             guard var root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
 
             var updated = false
+            if normalizeQuantizationMode(in: &root) {
+                updated = true
+            }
+
+            if normalizeLFM2LayerTypes(in: &root) {
+                updated = true
+            }
+
             if var textConfig = root["text_config"] as? [String: Any] {
                 if let intermediateArray = textConfig["intermediate_size"] as? [Any],
                    let firstValue = intermediateArray.first as? NSNumber {
@@ -47,6 +56,39 @@ struct GemmaConfigNormalizer {
                 "path": configURL.lastPathComponent
             ], level: .error)
         }
+    }
+
+    private static func normalizeQuantizationMode(in root: inout [String: Any]) -> Bool {
+        var updated = false
+        for key in ["quantization", "quantization_config"] {
+            guard var quantization = root[key] as? [String: Any],
+                  let mode = quantization["mode"],
+                  quantization["quantization_mode"] == nil else {
+                continue
+            }
+
+            quantization["quantization_mode"] = mode
+            quantization.removeValue(forKey: "mode")
+            root[key] = quantization
+            updated = true
+        }
+        return updated
+    }
+
+    private static func normalizeLFM2LayerTypes(in root: inout [String: Any]) -> Bool {
+        guard root["full_attn_idxs"] == nil,
+              let layerTypes = root["layer_types"] as? [String] else {
+            return false
+        }
+
+        let fullAttentionIndices = layerTypes.enumerated().compactMap { index, kind -> Int? in
+            let normalized = kind.replacingOccurrences(of: "-", with: "_").lowercased()
+            return normalized.contains("attention") ? index : nil
+        }
+
+        guard !fullAttentionIndices.isEmpty else { return false }
+        root["full_attn_idxs"] = fullAttentionIndices
+        return true
     }
 
     private static func normalizeIndex(in directory: URL) {
@@ -106,6 +148,39 @@ struct GemmaConfigNormalizer {
             AppLogger.download().log(event: "gemma:indexNormalizationFailed", data: [
                 "error": error.localizedDescription,
                 "path": indexURL.lastPathComponent
+            ], level: .error)
+        }
+    }
+
+    private static func normalizeTokenizerConfig(in directory: URL) {
+        let tokenizerConfigURL = directory.appendingPathComponent("tokenizer_config.json", isDirectory: false)
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: tokenizerConfigURL.path) else { return }
+
+        do {
+            let data = try Data(contentsOf: tokenizerConfigURL)
+            guard var root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+
+            guard let tokenizerClass = root["tokenizer_class"] as? String,
+                  tokenizerClass == "TokenizersBackend" else {
+                return
+            }
+
+            root["tokenizer_class"] = "PreTrainedTokenizer"
+
+            let normalizedData = try JSONSerialization.data(
+                withJSONObject: root,
+                options: [.prettyPrinted, .sortedKeys]
+            )
+            try normalizedData.write(to: tokenizerConfigURL, options: .atomic)
+            AppLogger.download().log(event: "gemma:tokenizerConfigNormalized", data: [
+                "path": tokenizerConfigURL.lastPathComponent,
+                "tokenizerClass": tokenizerClass
+            ])
+        } catch {
+            AppLogger.download().log(event: "gemma:tokenizerConfigNormalizationFailed", data: [
+                "error": error.localizedDescription,
+                "path": tokenizerConfigURL.lastPathComponent
             ], level: .error)
         }
     }

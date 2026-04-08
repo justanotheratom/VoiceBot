@@ -1,12 +1,29 @@
 import Foundation
 
-public enum ModelRuntimeError: Error, Sendable {
+public enum ModelRuntimeError: Error, LocalizedError, Sendable {
     case invalidURL
     case fileMissing
     case notLoaded
     case cancelled
     case leapSDKUnavailable
     case underlying(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "The model URL is invalid."
+        case .fileMissing:
+            return "The model file is missing from the disk."
+        case .notLoaded:
+            return "The model has not been loaded into memory."
+        case .cancelled:
+            return "The operation was cancelled."
+        case .leapSDKUnavailable:
+            return "Liquid AI Leap SDK is not available."
+        case .underlying(let message):
+            return message
+        }
+    }
 }
 
 public actor ModelRuntimeService {

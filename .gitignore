@@ -62,3 +62,4 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 Config/Shared.local.xcconfig
 Config/Environment.plist
+.env

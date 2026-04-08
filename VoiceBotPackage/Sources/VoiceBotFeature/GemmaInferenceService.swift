@@ -6,7 +6,6 @@ actor GemmaInferenceService {
     enum InferenceError: LocalizedError {
         case emptyConversation
         case modelUnavailable
-        case missingToken
 
         var errorDescription: String? {
             switch self {
@@ -14,8 +13,6 @@ actor GemmaInferenceService {
                 return "Conversation is empty"
             case .modelUnavailable:
                 return "Model files are not available yet"
-            case .missingToken:
-                return "Hugging Face token is missing. Provide LFM2ONIOS_HF_TOKEN via Environment.plist, Info.plist, or environment"
             }
         }
     }
@@ -107,6 +104,7 @@ actor GemmaInferenceService {
         }
 
         let task = Task { () throws -> ModelContainer in
+            GemmaConfigNormalizer.normalizeIfNeeded(in: modelDirectory)
             let configuration = ModelConfiguration(directory: modelDirectory)
             let hub = try GemmaHubClient.shared()
             return try await LLMModelFactory.shared.loadContainer(
@@ -115,13 +113,7 @@ actor GemmaInferenceService {
             )
         }
         loadingTask = task
-        let result: ModelContainer
-        do {
-            result = try await task.value
-        } catch is GemmaHubClient.Error {
-            loadingTask = nil
-            throw InferenceError.missingToken
-        }
+        let result = try await task.value
         loadingTask = nil
         container = result
         return result

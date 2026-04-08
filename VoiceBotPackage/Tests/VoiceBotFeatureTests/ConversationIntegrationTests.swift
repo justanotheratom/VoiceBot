@@ -8,22 +8,22 @@ import Foundation
 @MainActor
 func integrationCreateAndSaveConversation() throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     let conversationService = ConversationService()
     
     // Start new conversation
-    manager.startNewConversation(modelSlug: "lfm2-350m")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     manager.addUserMessage("Hello, this is a test conversation")
     
     // Verify conversation was created
     #expect(manager.currentConversation != nil)
-    #expect(manager.currentConversation?.modelSlug == "lfm2-350m")
+    #expect(manager.currentConversation?.modelSlug == "lfm25-1.2b-instruct")
     
     // Test that conversation was saved by loading all conversations
     let allConversations = conversationService.loadAllConversations()
     let savedConversation = allConversations.first { $0.id == manager.currentConversation?.id }
     #expect(savedConversation != nil)
-    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm25-1.2b-instruct")?.systemPrompt
     let expectedMessageCount = (systemPrompt == nil ? 0 : 1) + 1 // system? + user
     #expect(savedConversation?.messages.count == expectedMessageCount)
 }
@@ -32,9 +32,9 @@ func integrationCreateAndSaveConversation() throws {
 @MainActor
 func integrationContextWindowManagement() throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
-    manager.startNewConversation(modelSlug: "lfm2-1.2b")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     
     // Add multiple messages to test context window management
     for i in 1...10 {
@@ -61,9 +61,9 @@ func integrationContextWindowManagement() throws {
 @MainActor
 func integrationTitleGeneration() async throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
-    manager.startNewConversation(modelSlug: "lfm2-700m")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     manager.addUserMessage("What is machine learning?")
     
     #expect(manager.needsTitleGeneration == false)
@@ -77,7 +77,7 @@ func integrationTitleGeneration() async throws {
     
     // Verify conversation state
     let messages = manager.getMessagesForLLM()
-    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-700m")?.systemPrompt
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm25-1.2b-instruct")?.systemPrompt
     let expectedCount = (systemPrompt == nil ? 0 : 1) + 2 // system? + user + assistant
     #expect(messages.count == expectedCount)
 }
@@ -86,13 +86,13 @@ func integrationTitleGeneration() async throws {
 @MainActor
 func integrationConversationLoadingAndContinuation() throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     let conversationService = ConversationService()
     
     // Create and save a conversation
     let userMessage = ChatMessageModel(role: .user, content: "Original question")
     let assistantMessage = ChatMessageModel(role: .assistant, content: "Original answer")
-    var testConversation = ChatConversation(modelSlug: "lfm2-350m", initialMessage: userMessage)
+    var testConversation = ChatConversation(modelSlug: "lfm25-1.2b-instruct", initialMessage: userMessage)
     testConversation.addMessage(assistantMessage)
     testConversation.setTitle("Test Conversation")
     
@@ -127,19 +127,19 @@ func integrationSearchFunctionality() throws {
             title: "SwiftUI Discussion",
             userContent: "How do I create SwiftUI views?",
             assistantContent: "SwiftUI views are created by defining structs...",
-            modelSlug: "lfm2-350m"
+            modelSlug: "lfm25-1.2b-instruct"
         ),
         createTestConversation(
             title: "Python Programming",
             userContent: "What are Python decorators?",
             assistantContent: "Python decorators are a way to modify functions...",
-            modelSlug: "lfm2-700m"
+            modelSlug: "lfm25-1.2b-instruct"
         ),
         createTestConversation(
             title: "Machine Learning Basics",
             userContent: "Explain neural networks",
             assistantContent: "Neural networks are computational models...",
-            modelSlug: "lfm2-1.2b"
+            modelSlug: "lfm25-1.2b-instruct"
         )
     ]
     
@@ -182,7 +182,7 @@ func integrationConversationDeletion() throws {
         title: "Test for Deletion",
         userContent: "This will be deleted",
         assistantContent: "This response will also be deleted",
-        modelSlug: "lfm2-350m"
+        modelSlug: "lfm25-1.2b-instruct"
     )
     
     // Save conversation
@@ -211,7 +211,7 @@ func integrationConversationDeletion() throws {
 @MainActor
 func edgeCaseEmptyConversations() throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
     // Test empty conversation behavior
     #expect(manager.getMessagesForLLM().isEmpty)
@@ -219,11 +219,11 @@ func edgeCaseEmptyConversations() throws {
     #expect(manager.currentConversation == nil)
     
     // Start conversation but don't add messages
-    manager.startNewConversation(modelSlug: "lfm2-350m")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     #expect(manager.currentConversation != nil)
     
     let messages = manager.getMessagesForLLM()
-    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm25-1.2b-instruct")?.systemPrompt
     let expectedCount = (systemPrompt == nil ? 0 : 1)
     #expect(messages.count == expectedCount)
 }
@@ -232,9 +232,9 @@ func edgeCaseEmptyConversations() throws {
 @MainActor
 func edgeCaseLongConversations() async throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
-    manager.startNewConversation(modelSlug: "lfm2-350m")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     
     // Create a very long conversation (50 message pairs)
     for i in 1...50 {
@@ -247,7 +247,7 @@ func edgeCaseLongConversations() async throws {
     
     // Context window should limit LLM messages but all should be available for display
     #expect(llmMessages.count < allMessages.count)
-    let systemPrompt = ModelCatalog.entry(forSlug: "lfm2-350m")?.systemPrompt
+    let systemPrompt = ModelCatalog.entry(forSlug: "lfm25-1.2b-instruct")?.systemPrompt
     let expectedAllCount = (systemPrompt == nil ? 0 : 1) + (50 * 2) // system? + pairs
     #expect(allMessages.count == expectedAllCount)
     
@@ -259,9 +259,9 @@ func edgeCaseLongConversations() async throws {
 @MainActor
 func edgeCaseTitleGenerationFailures() async throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
-    manager.startNewConversation(modelSlug: "lfm2-350m")
+    manager.startNewConversation(modelSlug: "lfm25-1.2b-instruct")
     
     // Test with very short/minimal content
     manager.addUserMessage("?")
@@ -291,7 +291,7 @@ func edgeCaseFileSystemOperations() throws {
         title: "Test with émojis 🚀 and spëcial çharacters",
         userContent: "Content with 'quotes' and \"double quotes\" and new\nlines",
         assistantContent: "Response with special chars: @#$%^&*()_+{}|:<>?[];',./",
-        modelSlug: "lfm2-350m"
+        modelSlug: "lfm25-1.2b-instruct"
     )
     
     try service.saveConversation(specialConversation)
@@ -317,7 +317,7 @@ func performanceMultipleConversations() throws {
             title: "Performance Test Conversation \(i)",
             userContent: "Performance test user message \(i)",
             assistantContent: "Performance test assistant response \(i)",
-            modelSlug: "lfm2-350m"
+            modelSlug: "lfm25-1.2b-instruct"
         )
         try service.saveConversation(conversation)
         createdConversations.append(conversation)
