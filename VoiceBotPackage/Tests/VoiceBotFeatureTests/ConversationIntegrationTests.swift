@@ -8,7 +8,7 @@ import Foundation
 @MainActor
 func integrationCreateAndSaveConversation() throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     let conversationService = ConversationService()
     
     // Start new conversation
@@ -32,7 +32,7 @@ func integrationCreateAndSaveConversation() throws {
 @MainActor
 func integrationContextWindowManagement() throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
     manager.startNewConversation(modelSlug: "lfm2-1.2b")
     
@@ -61,7 +61,7 @@ func integrationContextWindowManagement() throws {
 @MainActor
 func integrationTitleGeneration() async throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
     manager.startNewConversation(modelSlug: "lfm2-700m")
     manager.addUserMessage("What is machine learning?")
@@ -86,7 +86,7 @@ func integrationTitleGeneration() async throws {
 @MainActor
 func integrationConversationLoadingAndContinuation() throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     let conversationService = ConversationService()
     
     // Create and save a conversation
@@ -211,7 +211,7 @@ func integrationConversationDeletion() throws {
 @MainActor
 func edgeCaseEmptyConversations() throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
     // Test empty conversation behavior
     #expect(manager.getMessagesForLLM().isEmpty)
@@ -232,7 +232,7 @@ func edgeCaseEmptyConversations() throws {
 @MainActor
 func edgeCaseLongConversations() async throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
     manager.startNewConversation(modelSlug: "lfm2-350m")
     
@@ -259,7 +259,7 @@ func edgeCaseLongConversations() async throws {
 @MainActor
 func edgeCaseTitleGenerationFailures() async throws {
     let mockRuntimeService = ModelRuntimeService()
-    let manager = ConversationManager(modelRuntimeService: mockRuntimeService)
+    let manager = ConversationStore(modelRuntimeService: mockRuntimeService)
     
     manager.startNewConversation(modelSlug: "lfm2-350m")
     
