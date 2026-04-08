@@ -110,13 +110,23 @@ public struct ModelRowCard: View {
     private var actionView: some View {
         switch downloadState {
         case .downloaded where isSelected:
-            Text("Active")
-                .font(.caption.weight(.medium))
+            Menu {
+                Button("Delete Model", role: .destructive) {
+                    onDelete()
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Active")
+                        .font(.caption.weight(.medium))
+                    Image(systemName: "chevron.down")
+                        .font(.caption2)
+                }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(.green.opacity(0.1))
                 .foregroundStyle(.green)
                 .clipShape(Capsule())
+            }
 
         case .downloaded:
             // Secondary actions in menu (not inline)

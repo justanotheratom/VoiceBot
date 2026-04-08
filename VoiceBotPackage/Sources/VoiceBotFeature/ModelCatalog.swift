@@ -83,10 +83,10 @@ public enum ModelCatalog {
     /// Curated list of models for MVP. Keep small and focused.
     public static let all: [ModelCatalogEntry] = [
         ModelCatalogEntry(
-            id: "lfm2.5-350m",
+            id: "lfm25-350m",
             displayName: "LFM2.5 350M",
             provider: "LiquidAI",
-            slug: "lfm2.5-350m",
+            slug: "lfm25-350m",
             quantizationSlug: "lfm2.5-350m-8da4w",
             estDownloadMB: 322,
             contextWindow: 8192,
