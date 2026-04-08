@@ -23,10 +23,15 @@ struct LeapModelDownloadAdapter: RuntimeModelDownloadAdapting {
             ], level: .error)
             throw ModelDownloadError.invalidURL
         }
+        guard let token = GemmaHubTokenProvider.huggingFaceToken() else {
+            throw ModelDownloadError.missingToken
+        }
+
         let hfModel = HuggingFaceDownloadableModel(
             ownerName: "LiquidAI",
             repoName: "LeapBundles",
-            filename: filename
+            filename: filename,
+            hfToken: token
         )
 
         do {
